@@ -15,6 +15,7 @@ test('game integrates two controllers, brief taps, damage, respawn, winner, rema
       toggle: (item, force = !this.classes.has(item)) => { force ? this.classes.add(item) : this.classes.delete(item); return force; }
     };
     addEventListener(name, fn) { (this.handlers[name] ??= []).push(fn); }
+    setAttribute(name, value) { this[name] = value; }
     async emit(name, event = {}) { for (const fn of this.handlers[name] ?? []) await fn(event); }
     appendChild(child) { this.children.push(child); child.parent = this; }
     append(...children) { children.forEach(child => this.appendChild(child)); }

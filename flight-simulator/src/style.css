@@ -137,6 +137,8 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px s
 .remote-setup label { display: block; margin-bottom: 6px; color: var(--muted); font-size: 0.72rem; }
 .remote-setup input { width: 100%; min-height: 44px; padding: 0 11px; border: 1px solid var(--line); border-radius: 7px; background: var(--cockpit); color: var(--ink); font-family: var(--mono); }
 .start-note { margin: 12px 0 20px; color: var(--muted); font-size: 0.72rem; text-align: center; }
+.sound-choice { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 36px; margin: -10px 0 14px; color: var(--ink); font-size: 0.76rem; cursor: pointer; }
+.sound-choice input { width: 18px; height: 18px; accent-color: var(--p1); }
 .start-actions { display: flex; justify-content: center; gap: 10px; }
 
 .match-result { position: fixed; top: 50%; left: 50%; z-index: var(--z-modal); display: flex; flex-direction: column; align-items: center; gap: 8px; min-width: 340px; padding: 30px; transform: translate(-50%, -50%); border-radius: 12px; background: var(--panel); text-align: center; }

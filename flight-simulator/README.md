@@ -72,6 +72,7 @@ Two independent ESP32 + MPU6050 remotes and a computer or Raspberry Pi running C
 | R | Reset match |
 | D | Toggle performance/network diagnostics |
 | L | Remote log with pause, clear and copy |
+| M / Sound button | Mute or unmute synthesized game audio |
 | Fullscreen button | Enter/leave fullscreen; Esc also exits |
 
 Firmware remains in `../flight_remote/flight_remote.ino` and was not changed. GPIO4/GPIO5 use internal pull-ups. Avoid holding GPIO5 during ESP32 power-on/reset.
@@ -79,6 +80,10 @@ Firmware remains in `../flight_remote/flight_remote.ino` and was not changed. GP
 Each hit removes 20 of 100 health. Five hits destroy an aircraft and award one point. First to five points wins, followed by an automatic rematch after three seconds. Respawn takes three seconds and gives two seconds of spawn protection, during which firing is disabled. Building collisions crash without awarding the opponent a point. The original minimum-altitude clamp and world-edge wrap remain.
 
 One remote uses its full-screen chase camera; two remotes automatically use left/right split screen. With neither remote, Player 1 has keyboard fallback. Player 1 is blue; Player 2 is red. Drone Mode uses a heading-only third-person camera, so strafing and visual tilt do not swing the view sideways.
+
+## Sound
+
+The simulator synthesizes engine/rotor loops, gun bursts, hit thuds, crash rumbles and low-altitude warning beeps with the browser's Web Audio API. There are no sound files, downloads or new dependencies. Select **Enable game audio** on the start screen, or use **M** or the sound button during play. The setting is remembered locally. Audio starts after pressing **Start simulation**, which satisfies browser autoplay rules. The warning text says “Pull up” when the airplane is too low. Stall and missile-lock sounds are reserved for future gameplay systems because the current simulator has no stall or missile-lock events.
 
 ## Development and production
 
@@ -158,6 +163,7 @@ flight-simulator/
     ├── aircraft/JetModels.js
     ├── aircraft/MilitaryModels.js
     ├── aircraft/AircraftScale.js
+    ├── audio/GameAudio.js
     ├── drone/
     │   ├── Drone.js
     │   └── DronePhysics.js
@@ -173,7 +179,7 @@ flight-simulator/
 
 NPM generates node_modules; build generates dist/index.html and dist/assets. Both are ignored by Git. No model, texture or audio assets existed, so empty public/assets directories are unnecessary. Put future static assets there and verify their production URLs.
 
-Game.js owns player records, selected mode/model, connection coordination, match rules and UI events. Related small features remain together rather than adding a class for every button/player. Aircraft.js retains the original arcade physics and swaps the selected model. AircraftModel.js contains the ATR 72 and model registry; JetModels.js builds the commercial jet variants; MilitaryModels.js builds the B-2, C-17 and F-16; AircraftScale.js applies one size conversion to all airplane models. Drone.js owns the shared low-poly geometry, propellers, reset and chase camera; DronePhysics.js owns dead-zone normalization, target velocity, acceleration, deceleration, hover-height correction and horizontal movement. City.js keeps town creation and static collision bounds; WeaponSystem.js includes the shared bullet pool.
+Game.js owns player records, selected mode/model, connection coordination, match rules and UI events. Related small features remain together rather than adding a class for every button/player. Aircraft.js retains the original arcade physics and swaps the selected model. AircraftModel.js contains the ATR 72 and model registry; JetModels.js builds the commercial jet variants; MilitaryModels.js builds the B-2, C-17 and F-16; AircraftScale.js applies one size conversion to all airplane models. GameAudio.js generates sound from existing gameplay events. Drone.js owns the shared low-poly geometry, propellers, reset and chase camera; DronePhysics.js owns dead-zone normalization, target velocity, acceleration, deceleration, hover-height correction and horizontal movement. City.js keeps town creation and static collision bounds; WeaponSystem.js includes the shared bullet pool.
 
 ```text
 ESP32 sockets → latest per-player controls + pending fire presses
@@ -219,4 +225,4 @@ Tests cover packet ordering/rollover, malformed input, independent remotes, shor
 
 ## Manual hardware checklist
 
-Load Chromium and check its console. In Airplane Mode, select each of the eight models and verify the silhouette, relative size, camera framing, bullet origin, original keyboard/remote directions and sensitivity. In Drone Mode, verify neutral hover, forward/back/right/left, slow-to-fast tilt response, diagonal speed cap, smooth neutral deceleration, fixed altitude, propellers, camera, building crashes and zero-velocity reset/respawn. In both modes verify P1-only/P2-only full-screen, automatic split-screen, GPIO4 calibration, short GPIO5 taps and held fire, five hits to destroy, scoring, three-second respawn, two-second protection, first-to-five winner and automatic rematch/reset. Test fullscreen/resize, independent unplug/reconnect, and production reload with internet disconnected but local Wi-Fi intact. Measure single/split performance on the actual Pi.
+Load Chromium and check its console. In Airplane Mode, select each of the eight models and verify the silhouette, relative size, camera framing, bullet origin, original keyboard/remote directions and sensitivity. In Drone Mode, verify neutral hover, forward/back/right/left, slow-to-fast tilt response, diagonal speed cap, smooth neutral deceleration, fixed altitude, propellers, camera, building crashes and zero-velocity reset/respawn. In both modes verify P1-only/P2-only full-screen, automatic split-screen, GPIO4 calibration, short GPIO5 taps and held fire, five hits to destroy, scoring, three-second respawn, two-second protection, first-to-five winner and automatic rematch/reset. Listen for engine changes, gunfire, hits, crashes and the low-altitude beep; verify sound can be muted and unmuted. Test fullscreen/resize, independent unplug/reconnect, and production reload with internet disconnected but local Wi-Fi intact. Measure single/split performance on the actual Pi.

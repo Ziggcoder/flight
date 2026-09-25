@@ -64,6 +64,7 @@
           </div>
 
           <p class="start-note">Both controllers and this computer must use the same Wi-Fi. Player 2 is optional.</p>
+          <label class="sound-choice" for="sound-enabled"><input id="sound-enabled" type="checkbox" checked><span>Enable game audio</span></label>
           <div class="start-actions">
             <button id="connect-button" class="button button--secondary" type="button">Save & connect remotes</button>
             <button id="start-button" class="button button--primary" type="button">Start simulation</button>
@@ -88,7 +89,7 @@
         <div id="connection-1" class="connection-tag connection-tag--offline"><i></i><span id="connection-text-1">Disconnected</span></div>
         <div class="reticle" aria-hidden="true"><i></i><i></i><i></i><i></i><b></b></div>
         <div id="hit-marker-1" class="hit-marker" aria-hidden="true">×</div>
-        <div id="warning-1" class="flight-warning is-hidden">Low altitude</div>
+        <div id="warning-1" class="flight-warning is-hidden">Pull up · low altitude</div>
         <div id="respawn-1" class="respawn-message is-hidden"><strong>Respawn <span>03</span></strong><small id="respawn-vehicle-1">Aircraft rebuilding</small></div>
       </section>
 
@@ -101,7 +102,7 @@
         <div id="connection-2" class="connection-tag connection-tag--offline"><i></i><span id="connection-text-2">Disconnected</span></div>
         <div class="reticle" aria-hidden="true"><i></i><i></i><i></i><i></i><b></b></div>
         <div id="hit-marker-2" class="hit-marker" aria-hidden="true">×</div>
-        <div id="warning-2" class="flight-warning is-hidden">Low altitude</div>
+        <div id="warning-2" class="flight-warning is-hidden">Pull up · low altitude</div>
         <div id="respawn-2" class="respawn-message is-hidden"><strong>Respawn <span>03</span></strong><small id="respawn-vehicle-2">Aircraft rebuilding</small></div>
       </section>
 
@@ -109,6 +110,7 @@
         <button id="calibrate-1" class="button button--dock" type="button">Calibrate P1</button>
         <button id="calibrate-2" class="button button--dock" type="button">Calibrate P2</button>
         <button id="reset-button" class="button button--dock" type="button">Reset match</button>
+        <button id="sound-button" class="button button--dock" type="button" aria-pressed="true">Mute sound · M</button>
         <button id="log-button" class="button button--dock" type="button">Remote log · L</button>
         <button id="fullscreen-button" class="button button--dock" type="button">Fullscreen</button>
       </section>

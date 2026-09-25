@@ -10,9 +10,11 @@ import { segmentHitsSphere, sphereIntersectsBounds } from '../collision/Collisio
 import { createRenderer, updateAspect } from './Renderer.js';
 import { GameLoop } from './GameLoop.js';
 import { createHUD, setText } from '../ui/HUD.js';
+import { GameAudio } from '../audio/GameAudio.js';
 import {
   AIRPLANE_PITCH_INVERSION,
   AIRPLANE_ROLL_INVERSION,
+  AUDIO_UPDATE_HZ,
   BULLET_SPEED,
   CONTROLLER_MAX_ANGLE,
   DRONE_FORWARD_INVERSION,
@@ -98,9 +100,13 @@ export function startGame() {
   const weapons = new WeaponSystem(scene, players);
   const bullets = weapons.bullets;
   const explosions = new ExplosionSystem(scene);
+  const audio = new GameAudio(players.length);
+  audio.setMuted(localStorage.getItem('simulatorSound') === 'off');
+  const audiblePlayers = [false, false];
 
   let gameTime = 0;
   let hudTimer = 0;
+  let audioTimer = 0;
   let toastTimer = null;
   let matchPaused = false;
   let rematchAt = 0;
@@ -141,6 +147,8 @@ export function startGame() {
     remoteLogEmpty: document.getElementById("remote-log-empty"),
     logPause: document.getElementById("log-pause"),
     toast: document.getElementById("toast"),
+    soundEnabled: document.getElementById('sound-enabled'),
+    soundButton: document.getElementById('sound-button'),
     modeInputs: [document.getElementById("game-mode-airplane"), document.getElementById("game-mode-drone")],
     aircraftPicker: document.getElementById('aircraft-picker'),
     aircraftModel: document.getElementById('aircraft-model'),
@@ -159,6 +167,22 @@ export function startGame() {
     localStorage.getItem("esp32RemoteIP2") || ""
   ];
   ui.remoteIP.forEach((input, index) => { input.value = savedIPs[index]; });
+
+  function updateSoundControls() {
+    const enabled = audio.supported && !audio.muted;
+    ui.soundEnabled.checked = enabled;
+    ui.soundEnabled.disabled = !audio.supported;
+    ui.soundButton.disabled = !audio.supported;
+    ui.soundButton.textContent = audio.supported ? (enabled ? 'Mute sound · M' : 'Unmute sound · M') : 'Audio unavailable';
+    ui.soundButton.setAttribute('aria-pressed', String(enabled));
+  }
+
+  function setSoundEnabled(enabled) {
+    audio.setMuted(!enabled);
+    localStorage.setItem?.('simulatorSound', enabled ? 'on' : 'off');
+    if (enabled && ui.startScreen.classList.contains('is-hidden')) audio.start();
+    updateSoundControls();
+  }
 
   function selectGameMode(mode) {
     if (mode !== "airplane" && mode !== "drone") return;
@@ -352,7 +376,9 @@ export function startGame() {
   }
 
   function fireBullet(index, immediate = false) {
-    return weapons.fire(index, gameTime, matchPaused, immediate);
+    const fired = weapons.fire(index, gameTime, matchPaused, immediate);
+    if (fired) audio.playShot(index);
+    return fired;
   }
   const removeBullet = (index) => weapons.remove(index);
   const updateBulletVisuals = () => weapons.updateVisuals();
@@ -361,6 +387,7 @@ export function startGame() {
     const target = players[targetIndex];
     if (!target.flight.alive || gameTime < target.invulnerableUntil || matchPaused) return;
     target.health = Math.max(0, target.health - 20);
+    audio.playHit();
     showHitMarker(attackerIndex);
     if (target.health > 0) return;
 
@@ -410,7 +437,10 @@ export function startGame() {
     window.setTimeout(() => marker.classList.remove("is-active"), 130);
   }
 
-  function createExplosion(position, playerIndex) { explosions.start(position, playerIndex, gameTime); }
+  function createExplosion(position, playerIndex) {
+    explosions.start(position, playerIndex, gameTime);
+    audio.playExplosion();
+  }
 
   function finishMatch(winnerIndex) {
     matchPaused = true;
@@ -585,6 +615,15 @@ export function startGame() {
     updateFlights(deltaTime);
     checkBuildingCollisions();
     updateCombat(deltaTime);
+    audioTimer += deltaTime;
+    if (audioTimer >= 1 / AUDIO_UPDATE_HZ) {
+      audioTimer = 0;
+      for (let index = 0; index < players.length; index++) {
+        audiblePlayers[index] = !matchPaused && (playerIsPresent(players[index]) ||
+          (index === 0 && !playerIsPresent(players[1])));
+      }
+      audio.update(players, gameMode, gameTime, audiblePlayers);
+    }
     for (const player of players) if (player.flight.alive) player.flight.updateCamera(deltaTime);
     hudTimer += deltaTime;
     if (hudTimer >= 1 / HUD_UPDATE_HZ) {
@@ -602,7 +641,13 @@ export function startGame() {
   document.getElementById("connect-button").addEventListener("click", () => {
     try { saveAndConnect(); } catch (error) { if (error.message !== "invalid-ip") throw error; }
   });
-  document.getElementById("start-button").addEventListener("click", () => ui.startScreen.classList.add("is-hidden"));
+  document.getElementById("start-button").addEventListener("click", () => {
+    audio.start();
+    updateSoundControls();
+    ui.startScreen.classList.add("is-hidden");
+  });
+  ui.soundEnabled.addEventListener('change', () => setSoundEnabled(ui.soundEnabled.checked));
+  ui.soundButton.addEventListener('click', () => setSoundEnabled(audio.muted));
   ui.modeInputs.forEach((input) => input.addEventListener("change", () => {
     if (input.checked) selectGameMode(input.value);
   }));
@@ -660,6 +705,7 @@ export function startGame() {
       ui.networkDebug.classList.toggle("is-hidden");
     }
     if (event.key.toLowerCase() === "l" && !event.repeat) toggleRemoteLog();
+    if (event.key.toLowerCase() === 'm' && !event.repeat) setSoundEnabled(audio.muted);
   });
   window.addEventListener("keyup", (event) => {
     if (Object.prototype.hasOwnProperty.call(keys, event.code)) keys[event.code] = false;
@@ -673,6 +719,7 @@ export function startGame() {
   });
 
   ui.aircraftModel.value = aircraftModel;
+  updateSoundControls();
   selectGameMode(gameMode);
   savedIPs.forEach((ip, index) => { if (validIPv4(ip)) connectPlayer(index); });
   updateViewMode();
@@ -680,10 +727,12 @@ export function startGame() {
   loop.start();
   window.addEventListener("pagehide", () => {
     loop.stop();
+    audio.suspend();
     for (const player of players) player.remote?.disconnect();
   });
   window.addEventListener("pageshow", (event) => {
     if (!event.persisted) return;
+    audio.start();
     for (const player of players) if (player.remote) { player.remote.shouldReconnect = true; player.remote.connect(); }
     loop.start();
   });

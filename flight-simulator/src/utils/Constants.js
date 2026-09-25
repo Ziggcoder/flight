@@ -1,6 +1,7 @@
 // Keep the original arcade feel; lower pixelRatio or disable shadows on a Pi.
 export const PERFORMANCE = { pixelRatio: 1.25, splitPixelRatio: 1, shadows: true, shadowMapSize: 1024 };
 export const HUD_UPDATE_HZ = 10;
+export const AUDIO_UPDATE_HZ = 20;
 export const MAX_DELTA_TIME = 0.05;
 export const MAX_BULLETS_PER_PLAYER = 96;
 export const BULLET_SPEED = 260;

@@ -13,6 +13,7 @@ import { createCity } from '../src/world/City.js';
 import { segmentHitsSphere, sphereIntersectsBounds } from '../src/collision/CollisionSystem.js';
 import { DRONE_HOVER_HEIGHT, DRONE_MAX_SPEED, MAX_BULLETS_PER_PLAYER } from '../src/utils/Constants.js';
 import { GameLoop } from '../src/core/GameLoop.js';
+import { GameAudio } from '../src/audio/GameAudio.js';
 
 function remote() {
   const motion = [], fire = [], statuses = [];
@@ -244,4 +245,56 @@ test('single RAF loop clamps a long frame and stops cleanly', () => {
   loop.start(); loop.start(); assert.equal(scheduled, 1);
   loop.frame(loop.previous + 3000); assert.equal(dt, 0.05);
   loop.stop(); assert.equal(canceled, 1);
+});
+
+test('procedural audio waits for a gesture, follows the active vehicle, and respects mute', () => {
+  const originalContext = globalThis.AudioContext;
+  class Parameter {
+    value = 0;
+    setTargetAtTime(value) { this.value = value; }
+    setValueAtTime(value) { this.value = value; }
+    exponentialRampToValueAtTime(value) { this.value = value; }
+  }
+  class AudioNode {
+    frequency = new Parameter(); gain = new Parameter(); playbackRate = new Parameter();
+    connect() { return this; }
+    disconnect() {}
+    start() {}
+    stop() { this.onended?.(); }
+  }
+  class FakeContext {
+    currentTime = 0; sampleRate = 1000; state = 'running'; destination = new AudioNode();
+    oscillators = 0; bursts = 0;
+    createGain() { return new AudioNode(); }
+    createOscillator() { this.oscillators++; return new AudioNode(); }
+    createBiquadFilter() { return new AudioNode(); }
+    createBufferSource() { this.bursts++; return new AudioNode(); }
+    createBuffer(channels, length) { return { getChannelData: () => new Float32Array(length) }; }
+    suspend() { this.state = 'suspended'; return Promise.resolve(); }
+    resume() { this.state = 'running'; return Promise.resolve(); }
+  }
+  globalThis.AudioContext = FakeContext;
+  try {
+    const audio = new GameAudio(2);
+    assert.equal(audio.context, null, 'audio does not start before a user gesture');
+    assert.equal(audio.start(), true);
+    assert.equal(audio.context.oscillators, 2, 'one continuous engine per player');
+    const player = { flight: { alive: true, flightSpeed: 42, rollAngle: 0.3, pitchAngle: 0,
+      object: { userData: { propellers: [] } }, isLowAltitude: () => false } };
+    audio.update([player, player], 'airplane', 0, [true, false]);
+    assert.ok(audio.engineLoops[0].gain.gain.value > 0);
+    assert.equal(audio.engineLoops[1].gain.gain.value, 0);
+    audio.playShot(0);
+    assert.equal(audio.context.bursts, 1);
+    audio.setMuted(true);
+    audio.playShot(0);
+    assert.equal(audio.context.bursts, 1, 'mute suppresses new effects');
+    audio.setMuted(false);
+    audio.context.currentTime = 0.1;
+    audio.playExplosion();
+    assert.equal(audio.context.bursts, 2);
+  } finally {
+    if (originalContext === undefined) delete globalThis.AudioContext;
+    else globalThis.AudioContext = originalContext;
+  }
 });
