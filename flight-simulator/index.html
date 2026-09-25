@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="oklch(0.12 0.015 248)">
+    <title>Flight Lab — Two Player Simulator</title>
+  </head>
+  <body>
+    <main id="simulator" aria-label="Two-player 3D flight simulator">
+      <div id="scene-container" aria-hidden="true"></div>
+
+      <section id="loading-error" class="message-panel is-hidden" role="alert">
+        <h1>Simulator could not start</h1>
+        <p id="loading-error-text">The simulator could not load. Check the local server and reload.</p>
+      </section>
+
+      <section id="start-screen" class="start-screen" aria-labelledby="start-title">
+        <div class="start-panel">
+          <p class="school-project">Flight Lab · Two-player training match</p>
+          <h1 id="start-title">Wireless Motion<br>Combat Simulator</h1>
+          <p class="start-instruction">Connect one or two ESP32 remotes. First pilot to five points wins the match; the next match starts automatically.</p>
+
+          <div class="remote-setup-grid">
+            <div class="remote-setup remote-setup--one">
+              <div class="remote-setup__heading"><strong>Player 1</strong><span id="setup-status-1">Offline</span></div>
+              <label for="remote-ip-1">ESP32 IP address</label>
+              <input id="remote-ip-1" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" placeholder="192.168.1.45">
+            </div>
+            <div class="remote-setup remote-setup--two">
+              <div class="remote-setup__heading"><strong>Player 2</strong><span id="setup-status-2">Offline</span></div>
+              <label for="remote-ip-2">ESP32 IP address</label>
+              <input id="remote-ip-2" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" placeholder="192.168.1.46">
+            </div>
+          </div>
+
+          <p class="start-note">Both controllers and this computer must use the same Wi-Fi. Player 2 is optional.</p>
+          <div class="start-actions">
+            <button id="connect-button" class="button button--secondary" type="button">Save & connect remotes</button>
+            <button id="start-button" class="button button--primary" type="button">Start simulation</button>
+          </div>
+        </div>
+      </section>
+
+      <header class="match-bar" aria-label="Match score">
+        <div class="match-player match-player--one"><strong>Player 1</strong><span id="score-1">0</span></div>
+        <div class="match-goal"><span>First to 5</span><small id="match-status">Training match</small></div>
+        <div class="match-player match-player--two"><span id="score-2">0</span><strong>Player 2</strong></div>
+      </header>
+
+      <div id="split-divider" class="split-divider is-hidden" aria-hidden="true"></div>
+
+      <section id="hud-1" class="player-hud player-hud--one" aria-label="Player 1 instruments">
+        <div class="instrument-rail">
+          <strong>Player 1</strong>
+          <dl><div><dt>ALT</dt><dd id="altitude-1">070</dd></div><div><dt>SPD</dt><dd id="speed-1">038</dd></div><div><dt>P</dt><dd id="pitch-1">0.0</dd></div><div><dt>R</dt><dd id="roll-1">0.0</dd></div></dl>
+        </div>
+        <div class="health-panel"><span>Health <b id="health-number-1">100</b></span><div class="health-track"><i id="health-fill-1"></i></div></div>
+        <div id="connection-1" class="connection-tag connection-tag--offline"><i></i><span>Disconnected</span></div>
+        <div class="reticle" aria-hidden="true"><i></i><i></i><i></i><i></i><b></b></div>
+        <div id="hit-marker-1" class="hit-marker" aria-hidden="true">×</div>
+        <div id="warning-1" class="flight-warning is-hidden">Low altitude</div>
+        <div id="respawn-1" class="respawn-message is-hidden"><strong>Respawn <span>03</span></strong><small>Aircraft rebuilding</small></div>
+      </section>
+
+      <section id="hud-2" class="player-hud player-hud--two is-hidden" aria-label="Player 2 instruments">
+        <div class="instrument-rail">
+          <strong>Player 2</strong>
+          <dl><div><dt>ALT</dt><dd id="altitude-2">070</dd></div><div><dt>SPD</dt><dd id="speed-2">038</dd></div><div><dt>P</dt><dd id="pitch-2">0.0</dd></div><div><dt>R</dt><dd id="roll-2">0.0</dd></div></dl>
+        </div>
+        <div class="health-panel"><span>Health <b id="health-number-2">100</b></span><div class="health-track"><i id="health-fill-2"></i></div></div>
+        <div id="connection-2" class="connection-tag connection-tag--offline"><i></i><span>Disconnected</span></div>
+        <div class="reticle" aria-hidden="true"><i></i><i></i><i></i><i></i><b></b></div>
+        <div id="hit-marker-2" class="hit-marker" aria-hidden="true">×</div>
+        <div id="warning-2" class="flight-warning is-hidden">Low altitude</div>
+        <div id="respawn-2" class="respawn-message is-hidden"><strong>Respawn <span>03</span></strong><small>Aircraft rebuilding</small></div>
+      </section>
+
+      <section class="control-dock" aria-label="Simulator controls">
+        <button id="calibrate-1" class="button button--dock" type="button">Calibrate P1</button>
+        <button id="calibrate-2" class="button button--dock" type="button">Calibrate P2</button>
+        <button id="reset-button" class="button button--dock" type="button">Reset match</button>
+        <button id="log-button" class="button button--dock" type="button">Remote log · L</button>
+        <button id="fullscreen-button" class="button button--dock" type="button">Fullscreen</button>
+      </section>
+
+      <section id="match-result" class="match-result is-hidden" role="status" aria-live="assertive">
+        <small>Match complete</small><strong id="winner-text">Player 1 wins</strong><span>Rematch starting in <b id="rematch-countdown">3</b></span>
+      </section>
+
+      <section id="network-debug" class="network-debug is-hidden" aria-label="Remote network diagnostics">
+        <p id="debug-performance"></p>
+        <header><strong>Remote link</strong><span>Press D to hide</span></header>
+        <div class="network-debug__row network-debug__row--one"><b>P1</b><code id="debug-1">OFFLINE · PING -- · 0 PPS · AGE -- · SEQ -- · FIRE OFF</code></div>
+        <div class="network-debug__row network-debug__row--two"><b>P2</b><code id="debug-2">OFFLINE · PING -- · 0 PPS · AGE -- · SEQ -- · FIRE OFF</code></div>
+      </section>
+
+      <section id="remote-log" class="remote-log is-hidden" aria-label="Live remote data log">
+        <header class="remote-log__header">
+          <div><strong>Remote data log</strong><span>Motion is sampled; events are immediate</span></div>
+          <div class="remote-log__actions">
+            <button id="log-pause" type="button">Pause</button>
+            <button id="log-clear" type="button">Clear</button>
+            <button id="log-copy" type="button">Copy</button>
+            <button id="log-close" type="button" aria-label="Close remote log">Close</button>
+          </div>
+        </header>
+        <div id="remote-log-empty" class="remote-log__empty">Waiting for a configured ESP32 remote…</div>
+        <ol id="remote-log-lines" class="remote-log__lines" aria-live="off"></ol>
+      </section>
+
+      <div id="toast" class="toast is-hidden" role="status" aria-live="polite"></div>
+    </main>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
