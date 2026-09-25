@@ -1,4 +1,26 @@
 import * as THREE from 'three';
+import { createJetModel } from './JetModels.js';
+import { createMilitaryModel } from './MilitaryModels.js';
+import { scaleAirplaneToRealRatio } from './AircraftScale.js';
+
+export const AIRCRAFT_MODELS = Object.freeze([
+  { id: 'atr72', label: 'ATR 72', hudLabel: 'ATR 72' },
+  { id: '777max', label: '777MAX (concept)', hudLabel: '777MAX' },
+  { id: 'a350', label: 'Airbus A350', hudLabel: 'A350' },
+  { id: '737', label: 'Boeing 737', hudLabel: '737' },
+  { id: '747', label: 'Boeing 747', hudLabel: '747' },
+  { id: 'b2', label: 'B-2 Spirit', hudLabel: 'B-2' },
+  { id: 'c17', label: 'C-17 Globemaster III', hudLabel: 'C-17' },
+  { id: 'f16', label: 'F-16 Fighting Falcon', hudLabel: 'F-16' }
+]);
+
+export function createAirplaneModel(modelId, primaryColor, accentColor) {
+  let airplane;
+  if (modelId === 'atr72') airplane = createATR72Model(primaryColor, accentColor);
+  else if (modelId === 'b2' || modelId === 'c17' || modelId === 'f16') airplane = createMilitaryModel(modelId, primaryColor);
+  else airplane = createJetModel(modelId, primaryColor, accentColor);
+  return scaleAirplaneToRealRatio(airplane, modelId);
+}
 
 // Shared low-poly geometry keeps both player aircraft inexpensive to render.
 const FUSELAGE_GEOMETRY = new THREE.CylinderGeometry(0.68, 0.78, 8.5, 10);
@@ -73,6 +95,9 @@ export function createATR72Model(primaryColor, accentColor) {
   const airplane = new THREE.Group();
   airplane.name = 'airplane';
   airplane.rotation.order = 'YXZ';
+  airplane.userData.modelId = 'atr72';
+  airplane.userData.weaponOffset = 6;
+  airplane.userData.cameraDistance = 17;
 
   const fuselageMaterial = new THREE.MeshLambertMaterial({ color: 0xe7edf2 });
   const primaryMaterial = new THREE.MeshLambertMaterial({ color: primaryColor });

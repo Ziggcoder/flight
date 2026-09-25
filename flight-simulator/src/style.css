@@ -24,8 +24,8 @@
 
 * { box-sizing: border-box; }
 html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: var(--cockpit); color: var(--ink); font-family: var(--sans); }
-button, input { font: inherit; }
-button:focus-visible, input:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+button, input, select { font: inherit; }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
 .is-hidden { display: none !important; }
 #simulator, #scene-container, #scene-container canvas { width: 100%; height: 100%; }
 #scene-container canvas { display: block; }
@@ -108,7 +108,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--focus); out
 .button--dock { min-height: 38px; padding-inline: 11px; font-size: 0.68rem; text-transform: uppercase; }
 
 .start-screen { position: fixed; inset: 0; z-index: var(--z-modal); display: grid; place-items: center; padding: 24px; background: oklch(0.08 0.01 248 / 0.84); }
-.start-panel { width: min(720px, 100%); padding: 36px 40px 32px; border-radius: 14px; background: var(--panel); }
+.start-panel { width: min(720px, 100%); max-height: calc(100vh - 32px); overflow: auto; padding: 36px 40px 32px; border-radius: 14px; background: var(--panel); }
 .school-project { margin: 0 0 8px; color: var(--amber); font-size: 0.72rem; font-weight: 850; letter-spacing: 0.08em; text-align: center; text-transform: uppercase; }
 .start-panel h1 { margin: 0; font-size: clamp(2rem, 4.5vw, 3.5rem); line-height: 1; letter-spacing: -0.035em; text-align: center; text-wrap: balance; }
 .start-instruction { max-width: 60ch; margin: 18px auto 22px; color: var(--muted); line-height: 1.55; text-align: center; text-wrap: pretty; }
@@ -123,6 +123,10 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--focus); out
 .game-mode-options input:focus-visible + span { outline: 3px solid var(--focus); outline-offset: 3px; }
 .game-mode-options strong { font-size: 0.82rem; text-transform: uppercase; }
 .game-mode-options small { margin-top: 3px; color: var(--muted); font-size: 0.68rem; }
+.aircraft-picker { display: flex; align-items: center; gap: 12px; margin: 0 0 18px; }
+.aircraft-picker label { flex: 0 0 auto; color: var(--muted); font-size: 0.72rem; font-weight: 800; text-transform: uppercase; }
+.aircraft-picker select { flex: 1; min-width: 0; min-height: 44px; padding: 0 10px; border: 1px solid var(--line); border-radius: 7px; background: var(--cockpit); color: var(--ink); cursor: pointer; }
+.aircraft-picker small { max-width: 18ch; color: var(--muted); font-size: 0.68rem; line-height: 1.35; }
 .remote-setup-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .remote-setup { padding: 16px; border: 1px solid var(--line); border-radius: 10px; }
 .remote-setup--one { border-top: 3px solid var(--p1); }
@@ -183,6 +187,9 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--focus); out
   .start-panel { padding: 26px 20px; max-height: calc(100vh - 24px); overflow: auto; }
   .start-actions { flex-direction: column; }
   .game-mode-options { flex-direction: column; }
+  .aircraft-picker { flex-wrap: wrap; }
+  .aircraft-picker label { width: 100%; }
+  .aircraft-picker small { max-width: none; }
   .match-player strong { display: none; }
   .match-bar { grid-template-columns: 1fr 100px 1fr; min-height: 56px; }
   .instrument-rail { width: 62px; padding-inline: 7px; }

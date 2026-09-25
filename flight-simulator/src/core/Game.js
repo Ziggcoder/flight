@@ -2,6 +2,7 @@ import { ExplosionSystem } from '../weapons/ExplosionSystem.js';
 import * as THREE from 'three';
 import { createCity } from '../world/City.js';
 import { ArcadeFlight } from '../aircraft/Aircraft.js';
+import { AIRCRAFT_MODELS } from '../aircraft/AircraftModel.js';
 import { ArcadeDrone } from '../drone/Drone.js';
 import { MotionRemote } from '../network/ControllerConnection.js';
 import { WeaponSystem } from '../weapons/WeaponSystem.js';
@@ -64,9 +65,12 @@ export function startGame() {
     return { pitch: 0, roll: 0, yawRate: 0, fire: false };
   }
 
+  const savedAircraftModel = localStorage.getItem('simulatorAircraftModel');
+  let aircraftModel = AIRCRAFT_MODELS.some((model) => model.id === savedAircraftModel) ? savedAircraftModel : 'atr72';
+
   const players = [1, 2].map((number, index) => {
     const vehicles = {
-      airplane: new ArcadeFlight(scene, cameras[index], number),
+      airplane: new ArcadeFlight(scene, cameras[index], number, aircraftModel),
       drone: new ArcadeDrone(scene, cameras[index], number)
     };
     vehicles.drone.setAlive(false);
@@ -138,6 +142,8 @@ export function startGame() {
     logPause: document.getElementById("log-pause"),
     toast: document.getElementById("toast"),
     modeInputs: [document.getElementById("game-mode-airplane"), document.getElementById("game-mode-drone")],
+    aircraftPicker: document.getElementById('aircraft-picker'),
+    aircraftModel: document.getElementById('aircraft-model'),
     respawnVehicle: [document.getElementById("respawn-vehicle-1"), document.getElementById("respawn-vehicle-2")]
   };
 
@@ -165,7 +171,8 @@ export function startGame() {
     }
     const droneMode = mode === "drone";
     document.body.classList.toggle("mode-drone", droneMode);
-    setText(ui.matchMode, droneMode ? "Drone mode" : "Airplane mode");
+    ui.aircraftPicker.classList.toggle('is-hidden', droneMode);
+    setText(ui.matchMode, droneMode ? "Drone mode" : `Airplane · ${AIRCRAFT_MODELS.find((model) => model.id === aircraftModel).hudLabel}`);
     for (let index = 0; index < players.length; index++) {
       setText(ui.altitudeLabel[index], droneMode ? "HGT" : "ALT");
       setText(ui.speedLabel[index], "SPD");
@@ -175,6 +182,18 @@ export function startGame() {
     }
     ui.modeInputs[0].checked = !droneMode;
     ui.modeInputs[1].checked = droneMode;
+  }
+
+  function selectAircraftModel(modelId) {
+    if (!AIRCRAFT_MODELS.some((model) => model.id === modelId)) return;
+    aircraftModel = modelId;
+    localStorage.setItem?.('simulatorAircraftModel', modelId);
+    for (const player of players) player.vehicles.airplane.setModel(modelId);
+    ui.aircraftModel.value = modelId;
+    if (gameMode === 'airplane') {
+      setText(ui.matchMode, `Airplane · ${AIRCRAFT_MODELS.find((model) => model.id === modelId).hudLabel}`);
+      updateHUD();
+    }
   }
 
   function createRemoteLogRow(entry) {
@@ -587,6 +606,7 @@ export function startGame() {
   ui.modeInputs.forEach((input) => input.addEventListener("change", () => {
     if (input.checked) selectGameMode(input.value);
   }));
+  ui.aircraftModel.addEventListener('change', () => selectAircraftModel(ui.aircraftModel.value));
   document.getElementById("calibrate-1").addEventListener("click", () => calibrate(0));
   document.getElementById("calibrate-2").addEventListener("click", () => calibrate(1));
   document.getElementById("reset-button").addEventListener("click", resetMatch);
@@ -652,6 +672,7 @@ export function startGame() {
     renderer.setSize(window.innerWidth, window.innerHeight);
   });
 
+  ui.aircraftModel.value = aircraftModel;
   selectGameMode(gameMode);
   savedIPs.forEach((ip, index) => { if (validIPv4(ip)) connectPlayer(index); });
   updateViewMode();

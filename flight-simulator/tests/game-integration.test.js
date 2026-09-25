@@ -130,6 +130,25 @@ test('game integrates two controllers, brief taps, damage, respawn, winner, rema
     await window.emit('keyup', { ...key, code: 'ArrowRight', key: 'ArrowRight' });
     assert.ok(drones[0].position.x > droneStart.x, 'drone keyboard input strafes right');
     assert.ok(drones[0].position.z < droneStart.z, 'drone keyboard input moves forward');
+
+    const modelPicker = element('aircraft-model');
+    for (const modelId of ['777max', 'a350', '737', '747', 'b2', 'c17', 'f16', 'atr72']) {
+      modelPicker.value = modelId;
+      await modelPicker.emit('change');
+      assert.equal(lastScene.children.filter(child => child.name === 'airplane').length, 2);
+      assert.ok(lastScene.children.filter(child => child.name === 'airplane').every(child => child.userData.modelId === modelId));
+      assert.ok(lastScene.children.filter(child => child.name === 'airplane').every(child => !child.visible), 'airplanes remain hidden in Drone Mode');
+    }
+    modelPicker.value = '747';
+    await modelPicker.emit('change');
+    const airplaneMode = element('game-mode-airplane');
+    airplaneMode.value = 'airplane';
+    airplaneMode.checked = true;
+    await airplaneMode.emit('change');
+    step();
+    assert.equal(element('match-mode').textContent, 'Airplane · 747');
+    assert.ok(lastScene.children.filter(child => child.name === 'airplane').every(child => child.visible));
+    assert.ok(lastScene.children.filter(child => child.name === 'drone').every(child => !child.visible));
   } finally {
     await window.emit('pagehide');
     delete globalThis.__flightTestRenderer;

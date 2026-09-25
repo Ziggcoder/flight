@@ -1,22 +1,24 @@
 import { ChaseCamera } from '../camera/ChaseCamera.js';
 import * as THREE from 'three';
-import { createATR72Model } from './AircraftModel.js';
+import { createAirplaneModel } from './AircraftModel.js';
 import { AIRCRAFT_PROPELLER_SPEED, AIRCRAFT_SPEED, PITCH_SENSITIVITY, ROLL_SENSITIVITY, TURN_RATE } from '../utils/Constants.js';
 /* Airplane geometry and deliberately simple arcade flight movement. */
 
 export class ArcadeFlight {
-  constructor(scene, camera, playerNumber) {
+  constructor(scene, camera, playerNumber, modelId = 'atr72') {
     this.scene = scene;
     this.camera = camera;
     this.playerNumber = playerNumber;
-    this.airplane = createATR72Model(
+    this.airplane = createAirplaneModel(
+      modelId,
       playerNumber === 1 ? 0x2488f5 : 0xef3d4d,
       playerNumber === 1 ? 0xf0bf43 : 0xffffff
     );
     this.object = this.airplane;
+    this.modelId = modelId;
     this.mode = "airplane";
     this.collisionRadius = 0;
-    this.weaponOffset = 6;
+    this.weaponOffset = this.airplane.userData.weaponOffset;
     this.scene.add(this.airplane);
 
     this.flightSpeed = AIRCRAFT_SPEED;
@@ -31,7 +33,34 @@ export class ArcadeFlight {
 
     this.forward = new THREE.Vector3();
     this.chase = new ChaseCamera(camera, this.airplane);
+    this.chase.distance = this.airplane.userData.cameraDistance;
     this.reset();
+  }
+
+  setModel(modelId) {
+    if (modelId === this.modelId) return;
+    const wasAlive = this.alive;
+    const next = createAirplaneModel(
+      modelId,
+      this.playerNumber === 1 ? 0x2488f5 : 0xef3d4d,
+      this.playerNumber === 1 ? 0xf0bf43 : 0xffffff
+    );
+    const previous = this.airplane;
+    const materials = new Set();
+    previous.traverse((part) => {
+      if (part.isMesh) materials.add(part.material);
+    });
+    this.scene.remove(previous);
+    for (const material of materials) material.dispose();
+    this.scene.add(next);
+    this.airplane = next;
+    this.object = next;
+    this.modelId = modelId;
+    this.chase.aircraft = next;
+    this.chase.distance = next.userData.cameraDistance;
+    this.weaponOffset = next.userData.weaponOffset;
+    this.reset();
+    this.setAlive(wasAlive);
   }
 
   reset() {

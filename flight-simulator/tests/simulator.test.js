@@ -5,6 +5,8 @@ import { MotionRemote, sequenceIsNewer } from '../src/network/ControllerConnecti
 import { WeaponSystem } from '../src/weapons/WeaponSystem.js';
 import { ExplosionSystem } from '../src/weapons/ExplosionSystem.js';
 import { ArcadeFlight } from '../src/aircraft/Aircraft.js';
+import { AIRCRAFT_MODELS, createAirplaneModel } from '../src/aircraft/AircraftModel.js';
+import { AIRCRAFT_DIMENSIONS_METRES, AIRCRAFT_UNITS_PER_METRE } from '../src/aircraft/AircraftScale.js';
 import { ArcadeDrone } from '../src/drone/Drone.js';
 import { DronePhysics, normalizeDroneAxis } from '../src/drone/DronePhysics.js';
 import { createCity } from '../src/world/City.js';
@@ -192,6 +194,29 @@ test('right input banks and turns right; camera and respawn reset remain valid',
   assert.equal(flight.airplane.userData.propellers[0].rotation.z, 0);
   flight.update(0.05, 0, -1, 0);
   assert.ok(flight.airplane.position.x < -8);
+});
+
+test('airplane choices have the expected engine layouts and keep their forward axis', () => {
+  const expectedEngines = { atr72: 0, '777max': 2, a350: 2, '737': 2, '747': 4, b2: 4, c17: 4, f16: 1 };
+  for (const model of AIRCRAFT_MODELS) {
+    const airplane = createAirplaneModel(model.id, 0x2488f5, 0xf0bf43);
+    const size = new THREE.Box3().setFromObject(airplane).getSize(new THREE.Vector3());
+    const dimensions = AIRCRAFT_DIMENSIONS_METRES[model.id];
+    assert.equal(airplane.name, 'airplane');
+    assert.equal(airplane.userData.modelId, model.id);
+    assert.equal(airplane.getObjectsByProperty('name', 'jet-engine').length, expectedEngines[model.id]);
+    assert.ok(Math.abs(size.x - dimensions.span * AIRCRAFT_UNITS_PER_METRE) < 0.001, `${model.id} wingspan`);
+    assert.ok(Math.abs(size.z - dimensions.length * AIRCRAFT_UNITS_PER_METRE) < 0.001, `${model.id} length`);
+    assert.ok(Math.abs(size.y - dimensions.height * AIRCRAFT_UNITS_PER_METRE) < 0.001, `${model.id} height`);
+    assert.ok(airplane.userData.weaponOffset > 0);
+  }
+  const scene = new THREE.Scene();
+  const flight = new ArcadeFlight(scene, new THREE.PerspectiveCamera(), 1);
+  flight.setModel('747');
+  assert.equal(flight.modelId, '747');
+  assert.equal(scene.children.filter(child => child.name === 'airplane').length, 1);
+  flight.update(0.05, 0, 0, 0);
+  assert.ok(flight.airplane.position.z < 260);
 });
 
 test('world retains all 72 colliders and 144 trees with roads in two meshes', () => {

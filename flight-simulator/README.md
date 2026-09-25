@@ -8,7 +8,37 @@ Choose one mode on the start screen. Both players use the selected vehicle durin
 
 ### Airplane Mode
 
-Airplane Mode preserves the original continuous-forward arcade flight model. The aircraft uses a low-poly ATR 72-style twin-turboprop model with animated six-blade propellers, a high wing and T-tail. Controller pitch changes aircraft pitch, controller roll banks and turns, and the existing yaw-rate assistance remains active.
+Airplane Mode preserves the original continuous-forward arcade flight model. Choose an airplane on the start screen; the same selection applies to both players and is remembered after a reload. Controller pitch changes aircraft pitch, controller roll banks and turns, and the existing yaw-rate assistance remains active. Every model uses the same arcade flight speed and sensitivity.
+
+| Airplane | Low-poly features |
+| --- | --- |
+| ATR 72 | High wing, T-tail, twin turboprops with animated propellers |
+| 777MAX (concept) | Long widebody, two large jet engines and raked wing tips |
+| Airbus A350 | Long widebody, swept wings, two engines and winglets |
+| Boeing 737 | Smaller narrowbody, two underwing engines and winglets |
+| Boeing 747 | Widebody with upper deck hump and four underwing engines |
+| B-2 Spirit | Flying wing with four recessed engines |
+| C-17 Globemaster III | High wing cargo plane, four engines and T-tail |
+| F-16 Fighting Falcon | Small single-engine fighter with swept wings and canopy |
+
+“777MAX” is the requested game model name; it is a concept design rather than an official aircraft designation. These are simplified recognisable shapes, not scale replicas. The chase camera and bullet spawn position adjust to the selected airframe.
+
+### Aircraft size ratio
+
+All eight models use **0.4 game units per metre** for overall wingspan, length and height. This makes the F-16 visibly much smaller than the B-2 and C-17. The model details are simplified, and all airplanes retain the same arcade flight physics.
+
+| Model | Reference wingspan | Reference length |
+| --- | ---: | ---: |
+| ATR 72-600 | 27.05 m | 27.17 m |
+| 777MAX concept (777-9 reference) | 71.8 m | 76.7 m |
+| A350-900 | 64.75 m | 66.8 m |
+| 737-800 | 35.8 m | 39.5 m |
+| 747-8 | 68.4 m | 76.3 m |
+| B-2 Spirit | 52.12 m | 20.9 m |
+| C-17 Globemaster III | 51.75 m | 53 m |
+| F-16 Fighting Falcon | 9.8 m | 14.8 m |
+
+Dimension references: [ATR](https://www.atr-aircraft.com/regional-mobility/regional-aircraft/atr-72-600/), [Boeing 777-9](https://www.boeing.com/commercial/777x), [Airbus A350-900](https://www.aircraft.airbus.com/en/aircraft/a350/a350-900), [Boeing 737-800](https://www.boeing.com/commercial/737ng), [Boeing 747-8](https://www.boeing.com/content/dam/boeing/boeingdotcom/company/about_bca/startup/pdf/historical/747-8I_-_passenger.pdf), [U.S. Air Force B-2](https://www.af.mil/About-Us/Fact-Sheets/Display/Article/104482/b-2-spirit/), [C-17](https://www.af.mil/About-Us/Fact-Sheets/Display/Article/1529726/c-17-globemaster-iii/), and [F-16](https://www.af.mil/About-Us/Fact-Sheets/Display/Article/104505/f-16-fighting-falcon/%20/lang/f-16-fighting-falcon/).
 
 ### Drone Mode
 
@@ -125,6 +155,9 @@ flight-simulator/
     ├── network/ControllerConnection.js
     ├── aircraft/Aircraft.js
     ├── aircraft/AircraftModel.js
+    ├── aircraft/JetModels.js
+    ├── aircraft/MilitaryModels.js
+    ├── aircraft/AircraftScale.js
     ├── drone/
     │   ├── Drone.js
     │   └── DronePhysics.js
@@ -140,7 +173,7 @@ flight-simulator/
 
 NPM generates node_modules; build generates dist/index.html and dist/assets. Both are ignored by Git. No model, texture or audio assets existed, so empty public/assets directories are unnecessary. Put future static assets there and verify their production URLs.
 
-Game.js owns player records, selected mode, connection coordination, match rules and UI events. Related small features remain together rather than adding a class for every button/player. Aircraft.js retains the original airplane geometry and arcade physics. Drone.js owns the shared low-poly geometry, propellers, reset and chase camera; DronePhysics.js owns dead-zone normalization, target velocity, acceleration, deceleration, hover-height correction and horizontal movement. City.js keeps town creation and static collision bounds; WeaponSystem.js includes the shared bullet pool.
+Game.js owns player records, selected mode/model, connection coordination, match rules and UI events. Related small features remain together rather than adding a class for every button/player. Aircraft.js retains the original arcade physics and swaps the selected model. AircraftModel.js contains the ATR 72 and model registry; JetModels.js builds the commercial jet variants; MilitaryModels.js builds the B-2, C-17 and F-16; AircraftScale.js applies one size conversion to all airplane models. Drone.js owns the shared low-poly geometry, propellers, reset and chase camera; DronePhysics.js owns dead-zone normalization, target velocity, acceleration, deceleration, hover-height correction and horizontal movement. City.js keeps town creation and static collision bounds; WeaponSystem.js includes the shared bullet pool.
 
 ```text
 ESP32 sockets → latest per-player controls + pending fire presses
@@ -172,7 +205,7 @@ npm run build
 npm run check
 ```
 
-Tests cover packet ordering/rollover, malformed input, independent remotes, short fire presses, stale-trigger recovery, connection cleanup, bullet pool/cadence/protection, swept collision, airplane steering, drone dead zone/response/diagonal speed/deceleration/reset, game-mode switching, world contents, explosion reuse and RAF clamping. The check script verifies JS syntax, imports and built HTML assets. See MIGRATION.md for actual results.
+Tests cover packet ordering/rollover, malformed input, independent remotes, short fire presses, stale-trigger recovery, connection cleanup, bullet pool/cadence/protection, swept collision, airplane steering and model choices, drone dead zone/response/diagonal speed/deceleration/reset, game-mode switching, world contents, explosion reuse and RAF clamping. The check script verifies JS syntax, imports and built HTML assets. See MIGRATION.md for actual results.
 
 ## Troubleshooting
 
@@ -186,4 +219,4 @@ Tests cover packet ordering/rollover, malformed input, independent remotes, shor
 
 ## Manual hardware checklist
 
-Load Chromium and check its console. In Airplane Mode, verify the original keyboard/remote flight directions and sensitivity. In Drone Mode, verify neutral hover, forward/back/right/left, slow-to-fast tilt response, diagonal speed cap, smooth neutral deceleration, fixed altitude, propellers, camera, building crashes and zero-velocity reset/respawn. In both modes verify P1-only/P2-only full-screen, automatic split-screen, GPIO4 calibration, short GPIO5 taps and held fire, five hits to destroy, scoring, three-second respawn, two-second protection, first-to-five winner and automatic rematch/reset. Test fullscreen/resize, independent unplug/reconnect, and production reload with internet disconnected but local Wi-Fi intact. Measure single/split performance on the actual Pi.
+Load Chromium and check its console. In Airplane Mode, select each of the eight models and verify the silhouette, relative size, camera framing, bullet origin, original keyboard/remote directions and sensitivity. In Drone Mode, verify neutral hover, forward/back/right/left, slow-to-fast tilt response, diagonal speed cap, smooth neutral deceleration, fixed altitude, propellers, camera, building crashes and zero-velocity reset/respawn. In both modes verify P1-only/P2-only full-screen, automatic split-screen, GPIO4 calibration, short GPIO5 taps and held fire, five hits to destroy, scoring, three-second respawn, two-second protection, first-to-five winner and automatic rematch/reset. Test fullscreen/resize, independent unplug/reconnect, and production reload with internet disconnected but local Wi-Fi intact. Measure single/split performance on the actual Pi.
