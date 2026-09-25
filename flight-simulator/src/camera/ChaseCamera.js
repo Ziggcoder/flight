@@ -1,18 +1,26 @@
 import * as THREE from 'three';
 
 export class ChaseCamera {
-  constructor(camera, aircraft) {
+  constructor(camera, aircraft, options = {}) {
     this.camera = camera;
     this.aircraft = aircraft;
+    this.headingOnly = options.headingOnly ?? false;
+    this.height = options.height ?? 6.5;
+    this.distance = options.distance ?? 17;
+    this.lookHeight = options.lookHeight ?? 1.2;
+    this.lookDistance = options.lookDistance ?? 9;
     this.offset = new THREE.Vector3();
     this.position = new THREE.Vector3();
     this.target = new THREE.Vector3();
     this.look = new THREE.Vector3();
+    this.orientation = new THREE.Quaternion();
   }
   targets() {
-    this.offset.set(0, 6.5, 17).applyQuaternion(this.aircraft.quaternion);
+    if (this.headingOnly) this.orientation.setFromAxisAngle(ChaseCamera.UP, this.aircraft.rotation.y);
+    else this.orientation.copy(this.aircraft.quaternion);
+    this.offset.set(0, this.height, this.distance).applyQuaternion(this.orientation);
     this.position.copy(this.aircraft.position).add(this.offset);
-    this.target.set(0, 1.2, -9).applyQuaternion(this.aircraft.quaternion).add(this.aircraft.position);
+    this.target.set(0, this.lookHeight, -this.lookDistance).applyQuaternion(this.orientation).add(this.aircraft.position);
   }
   snap() {
     this.targets();
@@ -27,3 +35,5 @@ export class ChaseCamera {
     this.camera.lookAt(this.look);
   }
 }
+
+ChaseCamera.UP = new THREE.Vector3(0, 1, 0);

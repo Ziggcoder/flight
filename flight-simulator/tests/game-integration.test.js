@@ -63,6 +63,12 @@ test('game integrates two controllers, brief taps, damage, respawn, winner, rema
     assert.equal(document.body.classList.contains('is-split'), true);
     assert.equal(renders, 2);
     const planes = lastScene.children.filter(child => child.name === 'airplane');
+    const airplaneStartX = planes[0].position.x;
+    await sockets[0].emit('message', { data: JSON.stringify({ type: 'motion', seq: 1, p: 0, r: -45, y: 0 }) });
+    step(5);
+    assert.ok(planes[0].position.x > airplaneStartX, 'mounted remote roll still turns the airplane right');
+    await sockets[0].emit('message', { data: JSON.stringify({ type: 'motion', seq: 2, p: 0, r: 0, y: 0 }) });
+    await element('reset-button').emit('click');
     step(42);
     let fireSeq = 0;
     const hit = async () => {
@@ -105,6 +111,25 @@ test('game integrates two controllers, brief taps, damage, respawn, winner, rema
     planes[0].position.set((box.minX + box.maxX) / 2, 8, (box.minZ + box.maxZ) / 2);
     step(3);
     assert.equal(element('health-number-1').textContent, '0', 'building collision crashes aircraft');
+
+    const droneMode = element('game-mode-drone');
+    droneMode.value = 'drone';
+    droneMode.checked = true;
+    await droneMode.emit('change');
+    step();
+    const drones = lastScene.children.filter(child => child.name === 'drone');
+    assert.equal(drones.length, 2);
+    assert.equal(drones[0].visible, true);
+    assert.equal(planes[0].visible, false);
+    assert.equal(element('match-mode').textContent, 'Drone mode');
+    const droneStart = drones[0].position.clone();
+    await window.emit('keydown', { ...key, code: 'ArrowUp', key: 'ArrowUp' });
+    await window.emit('keydown', { ...key, code: 'ArrowRight', key: 'ArrowRight' });
+    step(12);
+    await window.emit('keyup', { ...key, code: 'ArrowUp', key: 'ArrowUp' });
+    await window.emit('keyup', { ...key, code: 'ArrowRight', key: 'ArrowRight' });
+    assert.ok(drones[0].position.x > droneStart.x, 'drone keyboard input strafes right');
+    assert.ok(drones[0].position.z < droneStart.z, 'drone keyboard input moves forward');
   } finally {
     await window.emit('pagehide');
     delete globalThis.__flightTestRenderer;

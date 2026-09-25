@@ -5,17 +5,30 @@ export function setText(element, value) {
 
 export function createHUD(ui, players, getState) {
   return function updateHUD() {
-    const { gameTime, matchPaused } = getState();
+    const { gameTime, matchPaused, gameMode } = getState();
     players.forEach((player, index) => {
       setText(ui.score[index], player.score);
       setText(ui.health[index], player.health);
       const healthScale = `scaleX(${player.health / 100})`;
       if (ui.healthFill[index].style.transform !== healthScale) ui.healthFill[index].style.transform = healthScale;
-      setText(ui.altitude[index], String(Math.round(player.flight.airplane.position.y)).padStart(3, "0"));
+      setText(ui.altitude[index], String(Math.round(player.flight.object.position.y)).padStart(3, "0"));
       setText(ui.speed[index], String(Math.round(player.flight.flightSpeed)).padStart(3, "0"));
-      setText(ui.pitch[index], player.controls.pitch.toFixed(1));
-      setText(ui.roll[index], player.controls.roll.toFixed(1));
+      if (gameMode === "drone") {
+        setText(ui.pitch[index], `${Math.round(player.flight.inputForward * 100)}%`);
+        setText(ui.roll[index], `${Math.round(player.flight.inputStrafe * 100)}%`);
+      } else {
+        setText(ui.pitch[index], player.controls.pitch.toFixed(1));
+        setText(ui.roll[index], player.controls.roll.toFixed(1));
+      }
       ui.warning[index].classList.toggle("is-hidden", !player.flight.isLowAltitude() || !player.flight.alive);
+
+      if (player.connection === "connected") {
+        const pingValue = player.remote?.getDiagnostics().pingMs;
+        const connectionText = gameMode === "drone" && pingValue != null
+          ? `Connected · ${Math.round(pingValue)}ms`
+          : "Connected";
+        setText(ui.connectionText[index], connectionText);
+      }
 
       const respawning = !player.flight.alive && !matchPaused;
       ui.respawn[index].classList.toggle("is-hidden", !respawning);

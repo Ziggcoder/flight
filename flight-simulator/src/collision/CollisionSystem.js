@@ -9,3 +9,13 @@ export function segmentHitsSphere(start, end, center, radiusSquared) {
   const dz = start.z + t*z - center.z;
   return dx*dx + dy*dy + dz*dz < radiusSquared;
 }
+
+export function sphereIntersectsBounds(center, radius, bounds) {
+  const x = Math.max(bounds.minX, Math.min(center.x, bounds.maxX));
+  const y = Math.max(bounds.minY, Math.min(center.y, bounds.maxY));
+  const z = Math.max(bounds.minZ, Math.min(center.z, bounds.maxZ));
+  const dx = center.x - x;
+  const dy = center.y - y;
+  const dz = center.z - z;
+  return dx * dx + dy * dy + dz * dz <= radius * radius;
+}

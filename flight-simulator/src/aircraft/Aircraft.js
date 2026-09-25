@@ -60,6 +60,10 @@ export class ArcadeFlight {
       playerNumber === 1 ? 0x2488f5 : 0xef3d4d,
       playerNumber === 1 ? 0xf0bf43 : 0xffffff
     );
+    this.object = this.airplane;
+    this.mode = "airplane";
+    this.collisionRadius = 0;
+    this.weaponOffset = 6;
     this.scene.add(this.airplane);
 
     this.flightSpeed = AIRCRAFT_SPEED;
@@ -126,6 +130,10 @@ export class ArcadeFlight {
   }
 
   updateCamera(deltaTime) { this.chase.update(deltaTime); }
+
+  getForward(target) {
+    return target.set(0, 0, -1).applyQuaternion(this.airplane.quaternion).normalize();
+  }
 
   isLowAltitude() { return this.airplane.position.y < this.warningAltitude; }
 }

@@ -4,10 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="theme-color" content="oklch(0.12 0.015 248)">
-    <title>Flight Lab — Two Player Simulator</title>
+    <title>Flight Lab — Airplane & Drone Simulator</title>
   </head>
   <body>
-    <main id="simulator" aria-label="Two-player 3D flight simulator">
+    <main id="simulator" aria-label="Two-player 3D airplane and drone simulator">
       <div id="scene-container" aria-hidden="true"></div>
 
       <section id="loading-error" class="message-panel is-hidden" role="alert">
@@ -19,7 +19,21 @@
         <div class="start-panel">
           <p class="school-project">Flight Lab · Two-player training match</p>
           <h1 id="start-title">Wireless Motion<br>Combat Simulator</h1>
-          <p class="start-instruction">Connect one or two ESP32 remotes. First pilot to five points wins the match; the next match starts automatically.</p>
+          <p class="start-instruction">Choose one vehicle mode for both players, then connect one or two ESP32 remotes. First pilot to five points wins.</p>
+
+          <fieldset class="game-mode-picker">
+            <legend>Game mode</legend>
+            <div class="game-mode-options">
+              <label>
+                <input id="game-mode-airplane" type="radio" name="game-mode" value="airplane" checked>
+                <span><strong>Airplane mode</strong><small>Continuous forward arcade flight</small></span>
+              </label>
+              <label>
+                <input id="game-mode-drone" type="radio" name="game-mode" value="drone">
+                <span><strong>Drone mode</strong><small>Tilt to move, centre to hover</small></span>
+              </label>
+            </div>
+          </fieldset>
 
           <div class="remote-setup-grid">
             <div class="remote-setup remote-setup--one">
@@ -44,7 +58,7 @@
 
       <header class="match-bar" aria-label="Match score">
         <div class="match-player match-player--one"><strong>Player 1</strong><span id="score-1">0</span></div>
-        <div class="match-goal"><span>First to 5</span><small id="match-status">Training match</small></div>
+        <div class="match-goal"><span id="match-mode">Airplane mode</span><small id="match-status">Training match · first to 5</small></div>
         <div class="match-player match-player--two"><span id="score-2">0</span><strong>Player 2</strong></div>
       </header>
 
@@ -53,27 +67,27 @@
       <section id="hud-1" class="player-hud player-hud--one" aria-label="Player 1 instruments">
         <div class="instrument-rail">
           <strong>Player 1</strong>
-          <dl><div><dt>ALT</dt><dd id="altitude-1">070</dd></div><div><dt>SPD</dt><dd id="speed-1">038</dd></div><div><dt>P</dt><dd id="pitch-1">0.0</dd></div><div><dt>R</dt><dd id="roll-1">0.0</dd></div></dl>
+          <dl><div><dt id="altitude-label-1">ALT</dt><dd id="altitude-1">070</dd></div><div><dt id="speed-label-1">SPD</dt><dd id="speed-1">038</dd></div><div><dt id="pitch-label-1">P</dt><dd id="pitch-1">0.0</dd></div><div><dt id="roll-label-1">R</dt><dd id="roll-1">0.0</dd></div></dl>
         </div>
         <div class="health-panel"><span>Health <b id="health-number-1">100</b></span><div class="health-track"><i id="health-fill-1"></i></div></div>
-        <div id="connection-1" class="connection-tag connection-tag--offline"><i></i><span>Disconnected</span></div>
+        <div id="connection-1" class="connection-tag connection-tag--offline"><i></i><span id="connection-text-1">Disconnected</span></div>
         <div class="reticle" aria-hidden="true"><i></i><i></i><i></i><i></i><b></b></div>
         <div id="hit-marker-1" class="hit-marker" aria-hidden="true">×</div>
         <div id="warning-1" class="flight-warning is-hidden">Low altitude</div>
-        <div id="respawn-1" class="respawn-message is-hidden"><strong>Respawn <span>03</span></strong><small>Aircraft rebuilding</small></div>
+        <div id="respawn-1" class="respawn-message is-hidden"><strong>Respawn <span>03</span></strong><small id="respawn-vehicle-1">Aircraft rebuilding</small></div>
       </section>
 
       <section id="hud-2" class="player-hud player-hud--two is-hidden" aria-label="Player 2 instruments">
         <div class="instrument-rail">
           <strong>Player 2</strong>
-          <dl><div><dt>ALT</dt><dd id="altitude-2">070</dd></div><div><dt>SPD</dt><dd id="speed-2">038</dd></div><div><dt>P</dt><dd id="pitch-2">0.0</dd></div><div><dt>R</dt><dd id="roll-2">0.0</dd></div></dl>
+          <dl><div><dt id="altitude-label-2">ALT</dt><dd id="altitude-2">070</dd></div><div><dt id="speed-label-2">SPD</dt><dd id="speed-2">038</dd></div><div><dt id="pitch-label-2">P</dt><dd id="pitch-2">0.0</dd></div><div><dt id="roll-label-2">R</dt><dd id="roll-2">0.0</dd></div></dl>
         </div>
         <div class="health-panel"><span>Health <b id="health-number-2">100</b></span><div class="health-track"><i id="health-fill-2"></i></div></div>
-        <div id="connection-2" class="connection-tag connection-tag--offline"><i></i><span>Disconnected</span></div>
+        <div id="connection-2" class="connection-tag connection-tag--offline"><i></i><span id="connection-text-2">Disconnected</span></div>
         <div class="reticle" aria-hidden="true"><i></i><i></i><i></i><i></i><b></b></div>
         <div id="hit-marker-2" class="hit-marker" aria-hidden="true">×</div>
         <div id="warning-2" class="flight-warning is-hidden">Low altitude</div>
-        <div id="respawn-2" class="respawn-message is-hidden"><strong>Respawn <span>03</span></strong><small>Aircraft rebuilding</small></div>
+        <div id="respawn-2" class="respawn-message is-hidden"><strong>Respawn <span>03</span></strong><small id="respawn-vehicle-2">Aircraft rebuilding</small></div>
       </section>
 
       <section class="control-dock" aria-label="Simulator controls">

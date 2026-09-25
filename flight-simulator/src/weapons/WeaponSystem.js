@@ -30,8 +30,8 @@ export class WeaponSystem {
     if (!this.free.length || this.activeCounts[index] >= MAX_BULLETS_PER_PLAYER) return false;
     player.lastShotAt = now;
     const bullet = this.free.pop();
-    bullet.direction.set(0, 0, -1).applyQuaternion(player.flight.airplane.quaternion).normalize();
-    bullet.position.copy(player.flight.airplane.position).addScaledVector(bullet.direction, 6);
+    player.flight.getForward(bullet.direction);
+    bullet.position.copy(player.flight.object.position).addScaledVector(bullet.direction, player.flight.weaponOffset);
     bullet.previous.copy(bullet.position);
     bullet.owner = index;
     bullet.expiresAt = now + BULLET_LIFETIME;

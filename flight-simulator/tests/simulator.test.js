@@ -5,9 +5,11 @@ import { MotionRemote, sequenceIsNewer } from '../src/network/ControllerConnecti
 import { WeaponSystem } from '../src/weapons/WeaponSystem.js';
 import { ExplosionSystem } from '../src/weapons/ExplosionSystem.js';
 import { ArcadeFlight } from '../src/aircraft/Aircraft.js';
+import { ArcadeDrone } from '../src/drone/Drone.js';
+import { DronePhysics, normalizeDroneAxis } from '../src/drone/DronePhysics.js';
 import { createCity } from '../src/world/City.js';
-import { segmentHitsSphere } from '../src/collision/CollisionSystem.js';
-import { MAX_BULLETS_PER_PLAYER } from '../src/utils/Constants.js';
+import { segmentHitsSphere, sphereIntersectsBounds } from '../src/collision/CollisionSystem.js';
+import { DRONE_HOVER_HEIGHT, DRONE_MAX_SPEED, MAX_BULLETS_PER_PLAYER } from '../src/utils/Constants.js';
 import { GameLoop } from '../src/core/GameLoop.js';
 
 function remote() {
@@ -125,6 +127,54 @@ test('swept bullet hits between endpoints and rejects nearby misses', () => {
   assert.equal(segmentHitsSphere(a, b, new THREE.Vector3(), 30), true);
   assert.equal(segmentHitsSphere(a, b, new THREE.Vector3(0, 8, 0), 30), false);
   assert.equal(segmentHitsSphere(a, a, a, 30), true);
+});
+
+test('drone input dead zone, response curve and inversion are deterministic', () => {
+  assert.equal(normalizeDroneAxis(3.9), 0);
+  assert.equal(normalizeDroneAxis(-4), 0);
+  assert.equal(normalizeDroneAxis(45), 1);
+  assert.equal(normalizeDroneAxis(-45), -1);
+  assert.equal(normalizeDroneAxis(-45, -1), 1);
+  assert.ok(normalizeDroneAxis(12) < normalizeDroneAxis(25));
+});
+
+test('drone accelerates diagonally, respects max speed, then smoothly hovers', () => {
+  const object = new THREE.Group();
+  object.position.y = DRONE_HOVER_HEIGHT;
+  const physics = new DronePhysics(object);
+  for (let index = 0; index < 30; index++) physics.update(0.05, 45, -45, 0);
+  assert.ok(object.position.x > 0, 'raw mounted right tilt moves right');
+  assert.ok(object.position.z < 0, 'forward tilt moves forward');
+  assert.ok(physics.speed <= DRONE_MAX_SPEED + 1e-9);
+  const movingSpeed = physics.speed;
+  physics.update(0.05, 0, 0, 0);
+  assert.ok(physics.speed > 0, 'neutral does not stop instantly');
+  assert.ok(physics.speed < movingSpeed, 'neutral begins deceleration');
+  for (let index = 0; index < 20; index++) physics.update(0.05, 0, 0, 0);
+  assert.equal(physics.speed, 0);
+  assert.equal(physics.isHovering(), true);
+});
+
+test('drone reset clears velocity and its heading-only camera stays finite', () => {
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera();
+  const drone = new ArcadeDrone(scene, camera, 1);
+  drone.update(0.05, 45, -45, 0);
+  assert.ok(drone.flightSpeed > 0);
+  const propellerAngle = drone.drone.userData.propellers[0].rotation.y;
+  assert.ok(propellerAngle > 0);
+  drone.updateCamera(0.05);
+  assert.ok(Number.isFinite(camera.position.x));
+  drone.reset();
+  assert.equal(drone.flightSpeed, 0);
+  assert.equal(drone.physics.horizontalVelocity.lengthSq(), 0);
+  assert.equal(drone.drone.position.y, DRONE_HOVER_HEIGHT);
+});
+
+test('drone collision radius catches a building edge without changing point collision semantics', () => {
+  const bounds = { minX: 0, maxX: 10, minY: 0, maxY: 10, minZ: 0, maxZ: 10 };
+  assert.equal(sphereIntersectsBounds(new THREE.Vector3(-2, 5, 5), 3, bounds), true);
+  assert.equal(sphereIntersectsBounds(new THREE.Vector3(-4, 5, 5), 3, bounds), false);
 });
 
 test('right input banks and turns right; camera and respawn reset remain valid', () => {

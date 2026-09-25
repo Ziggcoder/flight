@@ -2,13 +2,24 @@ import { ExplosionSystem } from '../weapons/ExplosionSystem.js';
 import * as THREE from 'three';
 import { createCity } from '../world/City.js';
 import { ArcadeFlight } from '../aircraft/Aircraft.js';
+import { ArcadeDrone } from '../drone/Drone.js';
 import { MotionRemote } from '../network/ControllerConnection.js';
 import { WeaponSystem } from '../weapons/WeaponSystem.js';
-import { segmentHitsSphere } from '../collision/CollisionSystem.js';
+import { segmentHitsSphere, sphereIntersectsBounds } from '../collision/CollisionSystem.js';
 import { createRenderer, updateAspect } from './Renderer.js';
 import { GameLoop } from './GameLoop.js';
 import { createHUD, setText } from '../ui/HUD.js';
-import { PERFORMANCE, HUD_UPDATE_HZ, BULLET_SPEED, MAX_BULLETS_PER_PLAYER } from '../utils/Constants.js';
+import {
+  AIRPLANE_PITCH_INVERSION,
+  AIRPLANE_ROLL_INVERSION,
+  BULLET_SPEED,
+  CONTROLLER_MAX_ANGLE,
+  DRONE_FORWARD_INVERSION,
+  DRONE_STRAFE_INVERSION,
+  HUD_UPDATE_HZ,
+  MAX_BULLETS_PER_PLAYER,
+  PERFORMANCE
+} from '../utils/Constants.js';
 
 /* Two-player game setup, combat rules, split rendering, HUD, and controls. */
 
@@ -53,23 +64,31 @@ export function startGame() {
     return { pitch: 0, roll: 0, yawRate: 0, fire: false };
   }
 
-  const players = [1, 2].map((number, index) => ({
-    number,
-    camera: cameras[index],
-    flight: new ArcadeFlight(scene, cameras[index], number),
-    controls: makeControls(),
-    input: { pitch: 0, roll: 0, yawRate: 0 },
-    pendingShots: 0,
-    pendingConnection: null,
-    pendingCalibration: false,
-    remote: null,
-    connection: "disconnected",
-    health: 100,
-    score: 0,
-    respawnAt: 0,
-    invulnerableUntil: 2,
-    lastShotAt: -1
-  }));
+  const players = [1, 2].map((number, index) => {
+    const vehicles = {
+      airplane: new ArcadeFlight(scene, cameras[index], number),
+      drone: new ArcadeDrone(scene, cameras[index], number)
+    };
+    vehicles.drone.setAlive(false);
+    return {
+      number,
+      camera: cameras[index],
+      vehicles,
+      flight: vehicles.airplane,
+      controls: makeControls(),
+      input: { pitch: 0, roll: 0, yawRate: 0, keyboard: false },
+      pendingShots: 0,
+      pendingConnection: null,
+      pendingCalibration: false,
+      remote: null,
+      connection: "disconnected",
+      health: 100,
+      score: 0,
+      respawnAt: 0,
+      invulnerableUntil: 2,
+      lastShotAt: -1
+    };
+  });
 
   const keys = { ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false, Space: false };
   const weapons = new WeaponSystem(scene, players);
@@ -81,6 +100,7 @@ export function startGame() {
   let toastTimer = null;
   let matchPaused = false;
   let rematchAt = 0;
+  let gameMode = localStorage.getItem("simulatorGameMode") === "drone" ? "drone" : "airplane";
   const winningScore = 5;
 
   const ui = {
@@ -94,12 +114,18 @@ export function startGame() {
     speed: [document.getElementById("speed-1"), document.getElementById("speed-2")],
     pitch: [document.getElementById("pitch-1"), document.getElementById("pitch-2")],
     roll: [document.getElementById("roll-1"), document.getElementById("roll-2")],
+    altitudeLabel: [document.getElementById("altitude-label-1"), document.getElementById("altitude-label-2")],
+    speedLabel: [document.getElementById("speed-label-1"), document.getElementById("speed-label-2")],
+    pitchLabel: [document.getElementById("pitch-label-1"), document.getElementById("pitch-label-2")],
+    rollLabel: [document.getElementById("roll-label-1"), document.getElementById("roll-label-2")],
     connection: [document.getElementById("connection-1"), document.getElementById("connection-2")],
+    connectionText: [document.getElementById("connection-text-1"), document.getElementById("connection-text-2")],
     warning: [document.getElementById("warning-1"), document.getElementById("warning-2")],
     respawn: [document.getElementById("respawn-1"), document.getElementById("respawn-2")],
     hitMarker: [document.getElementById("hit-marker-1"), document.getElementById("hit-marker-2")],
     hud: [document.getElementById("hud-1"), document.getElementById("hud-2")],
     divider: document.getElementById("split-divider"),
+    matchMode: document.getElementById("match-mode"),
     matchStatus: document.getElementById("match-status"),
     matchResult: document.getElementById("match-result"),
     winnerText: document.getElementById("winner-text"),
@@ -110,7 +136,9 @@ export function startGame() {
     remoteLogLines: document.getElementById("remote-log-lines"),
     remoteLogEmpty: document.getElementById("remote-log-empty"),
     logPause: document.getElementById("log-pause"),
-    toast: document.getElementById("toast")
+    toast: document.getElementById("toast"),
+    modeInputs: [document.getElementById("game-mode-airplane"), document.getElementById("game-mode-drone")],
+    respawnVehicle: [document.getElementById("respawn-vehicle-1"), document.getElementById("respawn-vehicle-2")]
   };
 
   const remoteLogEntries = [];
@@ -125,6 +153,29 @@ export function startGame() {
     localStorage.getItem("esp32RemoteIP2") || ""
   ];
   ui.remoteIP.forEach((input, index) => { input.value = savedIPs[index]; });
+
+  function selectGameMode(mode) {
+    if (mode !== "airplane" && mode !== "drone") return;
+    gameMode = mode;
+    localStorage.setItem?.("simulatorGameMode", mode);
+    for (const player of players) {
+      for (const vehicle of Object.values(player.vehicles)) vehicle.setAlive(false);
+      player.flight = player.vehicles[mode];
+      player.flight.reset();
+    }
+    const droneMode = mode === "drone";
+    document.body.classList.toggle("mode-drone", droneMode);
+    setText(ui.matchMode, droneMode ? "Drone mode" : "Airplane mode");
+    for (let index = 0; index < players.length; index++) {
+      setText(ui.altitudeLabel[index], droneMode ? "HGT" : "ALT");
+      setText(ui.speedLabel[index], "SPD");
+      setText(ui.pitchLabel[index], droneMode ? "F/B" : "P");
+      setText(ui.rollLabel[index], droneMode ? "L/R" : "R");
+      setText(ui.respawnVehicle[index], droneMode ? "Drone rebuilding" : "Aircraft rebuilding");
+    }
+    ui.modeInputs[0].checked = !droneMode;
+    ui.modeInputs[1].checked = droneMode;
+  }
 
   function createRemoteLogRow(entry) {
     const row = document.createElement("li");
@@ -194,9 +245,8 @@ export function startGame() {
       (state) => { player.pendingConnection = state; },
       (packet) => {
         player.controls.pitch = packet.pitch;
-        // The physical MPU6050 mounting reports roll opposite to the aircraft.
-        // Reverse it so right controller tilt produces a right bank and turn.
-        player.controls.roll = -packet.roll;
+        // Keep raw sensor signs here. Each vehicle mode owns its orientation.
+        player.controls.roll = packet.roll;
         player.controls.yawRate = packet.yawRate;
       },
       (fire) => {
@@ -297,7 +347,7 @@ export function startGame() {
 
     target.flight.setAlive(false);
     target.respawnAt = gameTime + 3;
-    createExplosion(target.flight.airplane.position, targetIndex);
+    createExplosion(target.flight.object.position, targetIndex);
     players[attackerIndex].score += 1;
 
     if (players[attackerIndex].score >= winningScore) finishMatch(attackerIndex);
@@ -309,7 +359,7 @@ export function startGame() {
     player.health = 0;
     player.flight.setAlive(false);
     player.respawnAt = gameTime + 3;
-    createExplosion(player.flight.airplane.position, playerIndex);
+    createExplosion(player.flight.object.position, playerIndex);
     ui.matchStatus.textContent = `Player ${playerIndex + 1} crashed`;
     window.setTimeout(() => {
       if (!matchPaused) ui.matchStatus.textContent = "Training match";
@@ -319,11 +369,15 @@ export function startGame() {
   function checkBuildingCollisions() {
     players.forEach((player, playerIndex) => {
       if (!player.flight.alive) return;
-      const position = player.flight.airplane.position;
+      const position = player.flight.object.position;
+      const radius = player.flight.collisionRadius;
       for (const box of buildingColliders) {
-        if (position.x >= box.minX && position.x <= box.maxX &&
+        const collided = radius > 0
+          ? sphereIntersectsBounds(position, radius, box)
+          : position.x >= box.minX && position.x <= box.maxX &&
             position.y >= box.minY && position.y <= box.maxY &&
-            position.z >= box.minZ && position.z <= box.maxZ) {
+            position.z >= box.minZ && position.z <= box.maxZ;
+        if (collided) {
           crashPlayer(playerIndex);
           break;
         }
@@ -353,6 +407,7 @@ export function startGame() {
     players.forEach((player) => {
       player.pendingShots = 0;
       player.lastShotAt = -1;
+      player.controls.fire = false;
       player.score = 0;
       player.health = 100;
       player.respawnAt = 0;
@@ -384,7 +439,7 @@ export function startGame() {
       if (gameTime >= bullet.expiresAt) { removeBullet(index); continue; }
       const targetIndex = bullet.owner === 0 ? 1 : 0;
       const target = players[targetIndex];
-      if (target.flight.alive && segmentHitsSphere(bullet.previous, bullet.position, target.flight.airplane.position, 30)) {
+      if (target.flight.alive && segmentHitsSphere(bullet.previous, bullet.position, target.flight.object.position, 30)) {
         removeBullet(index);
         damagePlayer(targetIndex, bullet.owner);
       }
@@ -400,9 +455,9 @@ export function startGame() {
         player.flight.reset();
       }
       if (player.flight.alive && gameTime < player.invulnerableUntil) {
-        player.flight.airplane.visible = Math.floor(gameTime * 10) % 2 === 0;
+        player.flight.object.visible = Math.floor(gameTime * 10) % 2 === 0;
       } else if (player.flight.alive) {
-        player.flight.airplane.visible = true;
+        player.flight.object.visible = true;
       }
     });
 
@@ -413,10 +468,11 @@ export function startGame() {
     }
   }
 
-  function normalizedControls(player, index) {
-    let pitch = THREE.MathUtils.clamp(player.controls.pitch / 45, -1, 1);
-    let roll = THREE.MathUtils.clamp(player.controls.roll / 45, -1, 1);
+  function latestControls(player, index) {
+    let pitch = player.controls.pitch;
+    let roll = player.controls.roll;
     let yawRate = player.controls.yawRate;
+    let keyboard = false;
 
     // A stale stream returns toward neutral and cannot leave the gun stuck on.
     if (player.connection === "stale") {
@@ -428,26 +484,42 @@ export function startGame() {
 
     // Keyboard fallback controls Player 1 whenever its remote is unavailable.
     if (index === 0 && player.connection !== "connected" && player.connection !== "stale") {
-      pitch = (keys.ArrowDown ? 1 : 0) - (keys.ArrowUp ? 1 : 0);
-      roll = (keys.ArrowRight ? 1 : 0) - (keys.ArrowLeft ? 1 : 0);
+      const vertical = gameMode === "drone"
+        ? (keys.ArrowUp ? 1 : 0) - (keys.ArrowDown ? 1 : 0)
+        : (keys.ArrowDown ? 1 : 0) - (keys.ArrowUp ? 1 : 0);
+      pitch = vertical * CONTROLLER_MAX_ANGLE;
+      roll = ((keys.ArrowRight ? 1 : 0) - (keys.ArrowLeft ? 1 : 0)) * CONTROLLER_MAX_ANGLE;
       yawRate = 0;
+      keyboard = true;
       player.controls.fire = keys.Space;
     }
-    if (Math.abs(pitch) < 0.025) pitch = 0;
-    if (Math.abs(roll) < 0.025) roll = 0;
     player.input.pitch = pitch;
     player.input.roll = roll;
     player.input.yawRate = yawRate;
+    player.input.keyboard = keyboard;
     return player.input;
   }
 
   function updateFlights(deltaTime) {
     if (matchPaused) return;
     players.forEach((player, index) => {
-      const input = normalizedControls(player, index);
+      const input = latestControls(player, index);
       // The ESP32 and aircraft already provide light filtering. Applying a
       // third input filter here made steering visibly trail the controller.
-      player.flight.update(deltaTime, input.pitch, input.roll, input.yawRate);
+      if (gameMode === "airplane") {
+        let pitch = THREE.MathUtils.clamp(input.pitch / CONTROLLER_MAX_ANGLE, -1, 1) * AIRPLANE_PITCH_INVERSION;
+        let roll = THREE.MathUtils.clamp(input.roll / CONTROLLER_MAX_ANGLE, -1, 1);
+        if (!input.keyboard) roll *= AIRPLANE_ROLL_INVERSION;
+        if (Math.abs(pitch) < 0.025) pitch = 0;
+        if (Math.abs(roll) < 0.025) roll = 0;
+        player.flight.update(deltaTime, pitch, roll, input.yawRate);
+      } else {
+        // Keyboard values are already action-oriented; cancel the physical
+        // mounting inversions that DronePhysics applies to raw remote angles.
+        const pitch = input.keyboard ? input.pitch * DRONE_FORWARD_INVERSION : input.pitch;
+        const roll = input.keyboard ? input.roll * DRONE_STRAFE_INVERSION : input.roll;
+        player.flight.update(deltaTime, pitch, roll, 0);
+      }
     });
   }
 
@@ -476,7 +548,7 @@ export function startGame() {
     }
   }
 
-  const updateHUD = createHUD(ui, players, () => ({ gameTime, matchPaused }));
+  const updateHUD = createHUD(ui, players, () => ({ gameTime, matchPaused, gameMode }));
 
   const loop = new GameLoop((deltaTime) => {
     gameTime += deltaTime;
@@ -512,6 +584,9 @@ export function startGame() {
     try { saveAndConnect(); } catch (error) { if (error.message !== "invalid-ip") throw error; }
   });
   document.getElementById("start-button").addEventListener("click", () => ui.startScreen.classList.add("is-hidden"));
+  ui.modeInputs.forEach((input) => input.addEventListener("change", () => {
+    if (input.checked) selectGameMode(input.value);
+  }));
   document.getElementById("calibrate-1").addEventListener("click", () => calibrate(0));
   document.getElementById("calibrate-2").addEventListener("click", () => calibrate(1));
   document.getElementById("reset-button").addEventListener("click", resetMatch);
@@ -577,6 +652,7 @@ export function startGame() {
     renderer.setSize(window.innerWidth, window.innerHeight);
   });
 
+  selectGameMode(gameMode);
   savedIPs.forEach((ip, index) => { if (validIPv4(ip)) connectPlayer(index); });
   updateViewMode();
   updateHUD();

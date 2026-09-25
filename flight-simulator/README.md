@@ -1,6 +1,30 @@
 # ESP32 Wireless Motion Controlled Multiplayer Flight Simulator
 
-The existing school-project game, reorganized into Vite + NPM + vanilla JavaScript + Three.js + native WebSocket. The original aircraft, low-poly town, HUD and arcade flight controls are retained. No framework or physics engine is used.
+The existing school-project game, reorganized into Vite + NPM + vanilla JavaScript + Three.js + native WebSocket. It now offers Airplane Mode and Drone Mode while retaining the original aircraft, low-poly town, multiplayer combat, HUD and arcade flight controls. No framework or physics engine is used.
+
+## Game modes
+
+Choose one mode on the start screen. Both players use the selected vehicle during that match; mixed airplane-versus-drone matches are intentionally not enabled.
+
+### Airplane Mode
+
+Airplane Mode preserves the original continuous-forward arcade flight model. Controller pitch changes aircraft pitch, controller roll banks and turns, and the existing yaw-rate assistance remains active.
+
+### Drone Mode
+
+Drone Mode is simplified arcade physics for a school demonstration, not a real drone flight controller. The drone holds a fixed hover height and keeps its heading; MPU6050 pitch and roll request horizontal target velocity relative to that heading.
+
+| Controller movement | Drone action |
+| --- | --- |
+| Neutral / calibrated centre | Smoothly decelerate, stop and hover |
+| Tilt forward | Move forward |
+| Tilt backward | Move backward |
+| Tilt right | Strafe right |
+| Tilt left | Strafe left |
+| More tilt | Request more speed |
+| Combined pitch and roll | Move diagonally without exceeding maximum speed |
+
+The configurable input chain is: 4° dead zone → normalize against 45° → 1.4 response curve → target velocity → acceleration/deceleration. Returning to centre requests zero velocity; it does not stop the drone instantly. Drone attitude is visual feedback only and is limited to 14°. The low-poly propellers animate in the existing game loop.
 
 ## Hardware and controls
 
@@ -8,11 +32,13 @@ Two independent ESP32 + MPU6050 remotes and a computer or Raspberry Pi running C
 
 | Input | Action |
 | --- | --- |
-| Tilt right / left | Bank and turn right / left |
-| Tilt forward / backward | Pitch down / up |
+| Airplane: tilt right / left | Bank and turn right / left |
+| Airplane: tilt forward / backward | Pitch down / up |
+| Drone: tilt right / left | Strafe right / left |
+| Drone: tilt forward / backward | Move forward / backward |
 | GPIO4 to GND | Calibrate neutral position |
 | GPIO5 to GND | Hold to fire; short taps fire once |
-| Arrow keys / Space | Player 1 flight / fire when its remote is offline |
+| Arrow keys / Space | Player 1 movement / fire when its remote is offline |
 | R | Reset match |
 | D | Toggle performance/network diagnostics |
 | L | Remote log with pause, clear and copy |
@@ -22,7 +48,7 @@ Firmware remains in `../flight_remote/flight_remote.ino` and was not changed. GP
 
 Each hit removes 20 of 100 health. Five hits destroy an aircraft and award one point. First to five points wins, followed by an automatic rematch after three seconds. Respawn takes three seconds and gives two seconds of spawn protection, during which firing is disabled. Building collisions crash without awarding the opponent a point. The original minimum-altitude clamp and world-edge wrap remain.
 
-One remote uses its full-screen chase camera; two remotes automatically use left/right split screen. With neither remote, Player 1 has keyboard fallback. Player 1 is blue; Player 2 is red.
+One remote uses its full-screen chase camera; two remotes automatically use left/right split screen. With neither remote, Player 1 has keyboard fallback. Player 1 is blue; Player 2 is red. Drone Mode uses a heading-only third-person camera, so strafing and visual tilt do not swing the view sideways.
 
 ## Development and production
 
@@ -98,6 +124,9 @@ flight-simulator/
     │   └── Renderer.js
     ├── network/ControllerConnection.js
     ├── aircraft/Aircraft.js
+    ├── drone/
+    │   ├── Drone.js
+    │   └── DronePhysics.js
     ├── camera/ChaseCamera.js
     ├── weapons/
     │   ├── WeaponSystem.js
@@ -110,12 +139,14 @@ flight-simulator/
 
 NPM generates node_modules; build generates dist/index.html and dist/assets. Both are ignored by Git. No model, texture or audio assets existed, so empty public/assets directories are unnecessary. Put future static assets there and verify their production URLs.
 
-Game.js owns player records, connection coordination, match rules and UI events. Related small features remain together rather than adding a class for every button/player. Aircraft.js retains geometry and arcade physics; City.js keeps town creation and static collision bounds; WeaponSystem.js includes the bullet pool.
+Game.js owns player records, selected mode, connection coordination, match rules and UI events. Related small features remain together rather than adding a class for every button/player. Aircraft.js retains the original airplane geometry and arcade physics. Drone.js owns the shared low-poly geometry, propellers, reset and chase camera; DronePhysics.js owns dead-zone normalization, target velocity, acceleration, deceleration, hover-height correction and horizontal movement. City.js keeps town creation and static collision bounds; WeaponSystem.js includes the shared bullet pool.
 
 ```text
 ESP32 sockets → latest per-player controls + pending fire presses
                           ↓
-One RAF → aircraft → collisions/weapons → effects/respawn
+         selected mode: airplane OR drone (both players)
+                          ↓
+One RAF → active vehicles → collisions/weapons → effects/respawn
                           ↓
                 chase cameras → HUD (10 Hz) → one renderer
                                               ├─ P1 camera
@@ -124,7 +155,7 @@ One RAF → aircraft → collisions/weapons → effects/respawn
 
 ## Performance and debugging
 
-Tune src/utils/Constants.js and rebuild. Defaults: pixel ratio cap 1.25 single-view / 1.0 split-view, shadows enabled with 1024 maps, HUD 10 Hz, delta time capped at 0.05 s, 96 bullets per player, bullet speed 260 units/s, fire interval 0.065 s, aircraft speed 42 units/s. Original pitch/roll/turn sensitivity remains 24/55/58 degrees. For slower Pi hardware, try pixelRatio 1.0 and shadows false first.
+Tune src/utils/Constants.js and rebuild. Defaults: pixel ratio cap 1.25 single-view / 1.0 split-view, shadows enabled with 1024 maps, HUD 10 Hz, delta time capped at 0.05 s, 96 bullets per player, bullet speed 260 units/s, fire interval 0.065 s, and aircraft speed 42 units/s. Original pitch/roll/turn sensitivity remains 24/55/58 degrees. Drone defaults are maximum speed 38 units/s, acceleration 58 units/s², deceleration 76 units/s², hover height 12, 4° dead zone and 45° maximum controller input. For slower Pi hardware, try pixelRatio 1.0 and shadows false first.
 
 All 72 shops and 144 trees remain in InstancedMesh batches. Roads/markings merge from 28 meshes to two. Aircraft cast shadows; ground receives them. There are no textures or point lights. Bullets retain two Points batches with a fixed vector pool, active upload ranges and swept collision tests. Explosion meshes/materials are reused. Camera projection matrices update only when aspect changes. Network callbacks do not create bullets or update DOM. HUD text changes at most 10 times per second and only if its value changes. Remote log rows append on the HUD tick.
 
@@ -140,13 +171,13 @@ npm run build
 npm run check
 ```
 
-Tests cover packet ordering/rollover, malformed input, independent remotes, short fire presses, stale-trigger recovery, connection cleanup, bullet pool/cadence/protection, swept collision, steering, world contents, explosion reuse and RAF clamping. The check script verifies JS syntax, imports and built HTML assets. See MIGRATION.md for actual results.
+Tests cover packet ordering/rollover, malformed input, independent remotes, short fire presses, stale-trigger recovery, connection cleanup, bullet pool/cadence/protection, swept collision, airplane steering, drone dead zone/response/diagonal speed/deceleration/reset, game-mode switching, world contents, explosion reuse and RAF clamping. The check script verifies JS syntax, imports and built HTML assets. See MIGRATION.md for actual results.
 
 ## Troubleshooting
 
 - Disconnected: confirm same Wi-Fi, current DHCP IP and port 81. Press L; the HTTP server log does not show ESP32 WebSocket traffic.
 - Stale: inspect controller power/Wi-Fi. Old motion neutralizes controls and stops fire.
-- Direction: the original mounting correction negates remote roll in src/core/Game.js. Calibrate and physically verify left/right before changing axes.
+- Direction: airplane and drone signs are independent constants in src/utils/Constants.js. The current mounting uses `AIRPLANE_ROLL_INVERSION` and `DRONE_STRAFE_INVERSION` set to -1. Calibrate and physically verify forward/back/right/left before changing only the affected mode constant.
 - Shaking/drift: hold still during startup calibration, press GPIO4 to set neutral, and inspect MPU6050 wiring. Yaw is a rate, not compass heading.
 - Low FPS: enable hardware acceleration, close tabs, lower pixel ratio or disable shadows, rebuild and recopy dist.
 - Offline failure: copy all of dist including hashed assets, serve it over HTTP and hard reload. Python cannot serve source index.html after migration.
@@ -154,4 +185,4 @@ Tests cover packet ordering/rollover, malformed input, independent remotes, shor
 
 ## Manual hardware checklist
 
-Load Chromium and check its console. Verify keyboard flight/fire, P1-only/P2-only full-screen, automatic split-screen, physical right/left direction, GPIO4 calibration, short GPIO5 taps and held fire. Check building crashes, five hits to destroy, scoring, three-second respawn, two-second protection, first-to-five winner and automatic rematch/reset. Test fullscreen/resize, independent unplug/reconnect, and production reload with internet disconnected but local Wi-Fi intact. Measure single/split performance on the actual Pi.
+Load Chromium and check its console. In Airplane Mode, verify the original keyboard/remote flight directions and sensitivity. In Drone Mode, verify neutral hover, forward/back/right/left, slow-to-fast tilt response, diagonal speed cap, smooth neutral deceleration, fixed altitude, propellers, camera, building crashes and zero-velocity reset/respawn. In both modes verify P1-only/P2-only full-screen, automatic split-screen, GPIO4 calibration, short GPIO5 taps and held fire, five hits to destroy, scoring, three-second respawn, two-second protection, first-to-five winner and automatic rematch/reset. Test fullscreen/resize, independent unplug/reconnect, and production reload with internet disconnected but local Wi-Fi intact. Measure single/split performance on the actual Pi.
