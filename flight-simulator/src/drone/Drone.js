@@ -78,6 +78,7 @@ export class ArcadeDrone {
     this.inputForward = 0;
     this.inputStrafe = 0;
     this.alive = true;
+    this.worldLimit = 690;
     this.forward = new THREE.Vector3();
     this.chase = new ChaseCamera(camera, this.drone, {
       headingOnly: true,
@@ -127,8 +128,8 @@ export class ArcadeDrone {
 
     for (const propeller of this.drone.userData.propellers) propeller.rotation.y += DRONE_PROPELLER_SPEED * deltaTime;
 
-    if (Math.abs(this.drone.position.x) > 690) this.drone.position.x *= -0.82;
-    if (Math.abs(this.drone.position.z) > 690) this.drone.position.z *= -0.82;
+    if (Math.abs(this.drone.position.x) > this.worldLimit) this.drone.position.x *= -0.82;
+    if (Math.abs(this.drone.position.z) > this.worldLimit) this.drone.position.z *= -0.82;
   }
 
   updateCamera(deltaTime) { this.chase.update(deltaTime); }

@@ -1,6 +1,8 @@
 import { ExplosionSystem } from '../weapons/ExplosionSystem.js';
 import * as THREE from 'three';
+import { CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js';
 import { createCity } from '../world/City.js';
+import { createRealMapWorld } from '../world/realMap/RealMapWorld.js';
 import { ArcadeFlight } from '../aircraft/Aircraft.js';
 import { AIRCRAFT_MODELS } from '../aircraft/AircraftModel.js';
 import { ArcadeDrone } from '../drone/Drone.js';
@@ -40,6 +42,15 @@ export function startGame() {
     return;
   }
 
+  /* ── CSS2D label renderer (used by Kolar map labels) ── */
+  const labelRenderer = new CSS2DRenderer();
+  labelRenderer.setSize(window.innerWidth, window.innerHeight);
+  labelRenderer.domElement.style.position = 'absolute';
+  labelRenderer.domElement.style.top = '0';
+  labelRenderer.domElement.style.pointerEvents = 'none';
+  labelRenderer.domElement.classList.add('css2d-layer');
+  document.getElementById("scene-container").appendChild(labelRenderer.domElement);
+
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x89a9c1);
   scene.fog = new THREE.Fog(0x89a9c1, 260, 1050);
@@ -55,12 +66,60 @@ export function startGame() {
   sunlight.shadow.camera.top = 150;
   sunlight.shadow.camera.bottom = -150;
   scene.add(sunlight);
-  const city = createCity(scene);
-  const buildingColliders = city.userData.buildingColliders;
 
+  /* ── World selection ── */
+  const savedWorldMap = localStorage.getItem("simulatorWorldMap") || "arcade";
+  const worldMapInput = [
+    document.getElementById("world-arcade"),
+    document.getElementById("world-kolar")
+  ];
+  if (savedWorldMap === "kolar" && worldMapInput[1]) worldMapInput[1].checked = true;
+
+  let currentWorldGroup = null;
+  let buildingColliders  = [];
+  let worldHalfX = 690;
+  let worldHalfZ = 690;
+  let isKolarMap = savedWorldMap === "kolar";
+  let labelObjects = [];
+
+  function buildWorld(mapType) {
+    // Remove previous world
+    if (currentWorldGroup) scene.remove(currentWorldGroup);
+    buildingColliders = [];
+    labelObjects = [];
+
+    if (mapType === "kolar") {
+      isKolarMap = true;
+      scene.fog = new THREE.Fog(0x89a9c1, 800, 5000);
+      currentWorldGroup = createRealMapWorld(scene);
+      buildingColliders = currentWorldGroup.userData.buildingColliders;
+      labelObjects      = currentWorldGroup.userData.css2dObjects ?? [];
+      const bounds = currentWorldGroup.userData.worldBounds;
+      if (bounds) { worldHalfX = bounds.halfX; worldHalfZ = bounds.halfZ; }
+      labelRenderer.domElement.style.display = '';
+    } else {
+      isKolarMap = false;
+      scene.fog = new THREE.Fog(0x89a9c1, 260, 1050);
+      currentWorldGroup = createCity(scene);
+      buildingColliders = currentWorldGroup.userData.buildingColliders;
+      worldHalfX = 690;
+      worldHalfZ = 690;
+      labelRenderer.domElement.style.display = 'none';
+    }
+
+    // Apply world bounds to vehicle wrap limits
+    for (const player of players) {
+      if (player.vehicles) {
+        player.vehicles.airplane.worldLimit = Math.min(worldHalfX, worldHalfZ) - 50;
+        player.vehicles.drone.worldLimit    = Math.min(worldHalfX, worldHalfZ) - 50;
+      }
+    }
+  }
+
+  /* ── Player vehicle array (built before world, since buildWorld references players) ── */
   const cameras = [
-    new THREE.PerspectiveCamera(62, window.innerWidth / window.innerHeight, 0.1, 1500),
-    new THREE.PerspectiveCamera(62, window.innerWidth / window.innerHeight, 0.1, 1500)
+    new THREE.PerspectiveCamera(62, window.innerWidth / window.innerHeight, 0.1, 6000),
+    new THREE.PerspectiveCamera(62, window.innerWidth / window.innerHeight, 0.1, 6000)
   ];
 
   function makeControls() {
@@ -95,6 +154,27 @@ export function startGame() {
       lastShotAt: -1
     };
   });
+
+  /* ── Build the initial world (after players exist so buildWorld can set worldLimit) ── */
+  buildWorld(savedWorldMap);
+
+  /* ── Apply spawn positions from world data (overrides vehicle reset) ── */
+  function applySpawnFromWorld() {
+    const spawns = currentWorldGroup?.userData?.spawnPositions;
+    if (!spawns) return; // arcade town — use vehicle defaults
+    players.forEach((player, index) => {
+      const sp = spawns[index] ?? spawns[0];
+      const vehicle = player.flight;
+      const mode = gameMode;
+      const pos = sp[mode] ?? sp.drone;
+      if (!pos) return;
+      vehicle.object.position.set(pos.x, pos.y, pos.z);
+      if (typeof sp[`heading${mode.charAt(0).toUpperCase() + mode.slice(1)}`] === 'number') {
+        vehicle.headingAngle = sp[`heading${mode.charAt(0).toUpperCase() + mode.slice(1)}`];
+      }
+      vehicle.snapCamera?.();
+    });
+  }
 
   const keys = { ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false, Space: false };
   const weapons = new WeaponSystem(scene, players);
@@ -578,6 +658,7 @@ export function startGame() {
     const split = players.every(playerIsPresent);
     renderer.info.reset();
 
+    let activeCamera;
     if (split) {
       const half = Math.floor(width / 2);
       players.forEach((player, index) => {
@@ -588,12 +669,27 @@ export function startGame() {
         renderer.setScissor(left, 0, viewportWidth, height);
         renderer.render(scene, player.camera);
       });
+      activeCamera = players[0].camera;
     } else {
       const active = playerIsPresent(players[1]) ? players[1] : players[0];
       updateAspect(active.camera, width / height);
       renderer.setViewport(0, 0, width, height);
       renderer.setScissor(0, 0, width, height);
       renderer.render(scene, active.camera);
+      activeCamera = active.camera;
+    }
+
+    /* CSS2D labels — only rendered for Kolar map */
+    if (isKolarMap && labelObjects.length > 0) {
+      // Distance-cull labels: hide if > 800 m from camera
+      const camPos = activeCamera.position;
+      for (const obj of labelObjects) {
+        const dx = obj.position.x - camPos.x;
+        const dz = obj.position.z - camPos.z;
+        const dist = Math.sqrt(dx * dx + dz * dz);
+        obj.visible = dist < 800;
+      }
+      labelRenderer.render(scene, activeCamera);
     }
   }
 
@@ -716,6 +812,21 @@ export function startGame() {
     const split = players.every(playerIsPresent);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, split ? PERFORMANCE.splitPixelRatio : PERFORMANCE.pixelRatio));
     renderer.setSize(window.innerWidth, window.innerHeight);
+    labelRenderer.setSize(window.innerWidth, window.innerHeight);
+  });
+
+  /* World map radio buttons */
+  worldMapInput.forEach((input) => {
+    if (!input) return;
+    input.addEventListener("change", () => {
+      if (!input.checked) return;
+      const mapType = input.value;
+      localStorage.setItem("simulatorWorldMap", mapType);
+      buildWorld(mapType);
+      resetMatch();
+      applySpawnFromWorld();
+      showToast(mapType === "kolar" ? "Kolar Road Map loaded" : "Arcade Town loaded");
+    });
   });
 
   ui.aircraftModel.value = aircraftModel;
