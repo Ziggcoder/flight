@@ -8,7 +8,7 @@ Choose one mode on the start screen. Both players use the selected vehicle durin
 
 ### Airplane Mode
 
-Airplane Mode preserves the original continuous-forward arcade flight model. Controller pitch changes aircraft pitch, controller roll banks and turns, and the existing yaw-rate assistance remains active.
+Airplane Mode preserves the original continuous-forward arcade flight model. The aircraft uses a low-poly ATR 72-style twin-turboprop model with animated six-blade propellers, a high wing and T-tail. Controller pitch changes aircraft pitch, controller roll banks and turns, and the existing yaw-rate assistance remains active.
 
 ### Drone Mode
 
@@ -124,6 +124,7 @@ flight-simulator/
     │   └── Renderer.js
     ├── network/ControllerConnection.js
     ├── aircraft/Aircraft.js
+    ├── aircraft/AircraftModel.js
     ├── drone/
     │   ├── Drone.js
     │   └── DronePhysics.js

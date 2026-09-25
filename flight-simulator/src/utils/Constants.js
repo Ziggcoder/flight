@@ -7,6 +7,7 @@ export const BULLET_SPEED = 260;
 export const FIRE_INTERVAL = 0.065;
 export const BULLET_LIFETIME = 2;
 export const AIRCRAFT_SPEED = 42;
+export const AIRCRAFT_PROPELLER_SPEED = 46;
 export const PITCH_SENSITIVITY = 24;
 export const ROLL_SENSITIVITY = 55;
 export const TURN_RATE = 58;

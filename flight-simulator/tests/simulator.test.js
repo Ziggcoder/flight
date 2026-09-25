@@ -179,7 +179,9 @@ test('drone collision radius catches a building edge without changing point coll
 
 test('right input banks and turns right; camera and respawn reset remain valid', () => {
   const flight = players(new THREE.Scene())[0].flight;
+  assert.equal(flight.airplane.userData.propellers.length, 2);
   flight.update(0.05, 0, 1, 0);
+  assert.ok(flight.airplane.userData.propellers[0].rotation.z > 0);
   assert.ok(flight.airplane.rotation.z < 0);
   assert.ok(flight.airplane.position.x > -8);
   flight.updateCamera(0.05);
@@ -187,6 +189,7 @@ test('right input banks and turns right; camera and respawn reset remain valid',
   flight.setAlive(false); flight.reset();
   assert.equal(flight.alive, true);
   assert.equal(flight.airplane.position.z, 260);
+  assert.equal(flight.airplane.userData.propellers[0].rotation.z, 0);
   flight.update(0.05, 0, -1, 0);
   assert.ok(flight.airplane.position.x < -8);
 });
